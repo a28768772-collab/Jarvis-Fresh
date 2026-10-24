@@ -16,13 +16,18 @@
     <uses-permission
         android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- JARVIS CONTACT CALLING -->
+    <!-- JARVIS CONTACT AND PHONE CALLING -->
 
     <uses-permission
         android:name="android.permission.READ_CONTACTS" />
 
     <uses-permission
         android:name="android.permission.CALL_PHONE" />
+
+    <!-- INCOMING CALL ANSWER / REJECT -->
+
+    <uses-permission
+        android:name="android.permission.ANSWER_PHONE_CALLS" />
 
     <!-- FLOATING EMOJI BUBBLE PERMISSION -->
 
