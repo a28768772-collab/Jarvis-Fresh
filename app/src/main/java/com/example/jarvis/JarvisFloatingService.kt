@@ -1,3 +1,4 @@
+
 package com.example.jarvis
 
 import android.app.Service
@@ -235,7 +236,6 @@ class JarvisFloatingService : Service(),
         greetingPending = true
 
         if (!ttsReady) {
-            // TTS तैयार होने पर greeting शुरू होगी।
             return
         }
 
@@ -259,6 +259,7 @@ class JarvisFloatingService : Service(),
     }
 
     private fun finishGreeting() {
+
         handler.removeCallbacks(animation)
 
         speaking = false
@@ -274,13 +275,21 @@ class JarvisFloatingService : Service(),
         }
     }
 
+    // UPDATED: DIRECT LISTENING AFTER BUBBLE GREETING
+
     private fun startVoiceService() {
 
         try {
             val intent = Intent(
                 this,
                 JarvisVoiceService::class.java
-            )
+            ).apply {
+
+                putExtra(
+                    JarvisVoiceService.EXTRA_DIRECT_LISTEN,
+                    true
+                )
+            }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(intent)
@@ -289,9 +298,6 @@ class JarvisFloatingService : Service(),
             }
 
         } catch (_: Exception) {
-
-            // कुछ Android वर्जन Background Microphone
-            // Service को Overlay से शुरू नहीं करने देते।
 
             active = false
             bubble?.text = "😕"
@@ -371,6 +377,7 @@ class JarvisFloatingService : Service(),
             }
 
         } else {
+
             ttsReady = false
 
             if (greetingPending && active) {
