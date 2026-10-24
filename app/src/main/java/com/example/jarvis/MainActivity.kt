@@ -26,6 +26,7 @@ class MainActivity : Activity(),
     private val speechRequest = 42
     private val audioRequest = 101
     private val overlayRequest = 202
+    private val contactRequest = 303
 
     private val manager by lazy {
         JarvisCommandManager(this)
@@ -46,7 +47,7 @@ class MainActivity : Activity(),
         scrollView.addView(layout)
 
         layout.addView(TextView(this).apply {
-            text = "JARVIS ULTIMATE 3.5"
+            text = "JARVIS ULTIMATE 3.6"
             textSize = 27f
             gravity = Gravity.CENTER
         })
@@ -84,6 +85,7 @@ class MainActivity : Activity(),
         }
 
         addButton("❌ HIDE FLOATING JARVIS") {
+
             stopService(
                 Intent(
                     this,
@@ -109,14 +111,32 @@ class MainActivity : Activity(),
         }
 
         addButton("STOP LISTENING") {
-            stopService(
-                Intent(
-                    this,
-                    JarvisVoiceService::class.java
+
+            val intent = Intent(
+                this,
+                JarvisVoiceService::class.java
+            ).apply {
+                action = JarvisVoiceService.SLEEP
+            }
+
+            try {
+                startService(intent)
+            } catch (_: Exception) {
+                stopService(
+                    Intent(
+                        this,
+                        JarvisVoiceService::class.java
+                    )
                 )
-            )
+            }
 
             say("Jarvis Listening बंद कर दी गई है")
+        }
+
+        // CONTACT PERMISSIONS
+
+        addButton("📞 ENABLE CONTACT CALLING") {
+            checkContactPermissions()
         }
 
         // ACCESSIBILITY CONTROL
@@ -184,6 +204,99 @@ class MainActivity : Activity(),
         checkAudioPermission()
     }
 
+    // CONTACT AND PHONE PERMISSIONS
+
+    private fun checkContactPermissions(): Boolean {
+
+        val missing = mutableListOf<String>()
+
+        if (
+            checkSelfPermission(
+                Manifest.permission.READ_CONTACTS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            missing.add(Manifest.permission.READ_CONTACTS)
+        }
+
+        if (
+            checkSelfPermission(
+                Manifest.permission.CALL_PHONE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            missing.add(Manifest.permission.CALL_PHONE)
+        }
+
+        if (missing.isEmpty()) {
+
+            say("Contacts और Phone Call की अनुमति पहले से चालू है")
+            return true
+        }
+
+        requestPermissions(
+            missing.toTypedArray(),
+            contactRequest
+        )
+
+        return false
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(
+            requestCode,
+            permissions,
+            grantResults
+        )
+
+        when (requestCode) {
+
+            contactRequest -> {
+
+                val contactsAllowed =
+                    checkSelfPermission(
+                        Manifest.permission.READ_CONTACTS
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                val phoneAllowed =
+                    checkSelfPermission(
+                        Manifest.permission.CALL_PHONE
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                when {
+
+                    contactsAllowed && phoneAllowed -> {
+                        say("Jarvis Contact Calling तैयार है")
+                    }
+
+                    contactsAllowed -> {
+                        say("Contacts की अनुमति मिल गई है। कॉल लगाने के लिए Phone Permission भी दें")
+                    }
+
+                    else -> {
+                        say("Contact खोजने के लिए Contacts Permission जरूरी है")
+                    }
+                }
+            }
+
+            audioRequest -> {
+
+                val allowed =
+                    grantResults.isNotEmpty() &&
+                    grantResults[0] ==
+                    PackageManager.PERMISSION_GRANTED
+
+                if (allowed) {
+                    status.text = "माइक्रोफोन की अनुमति मिल गई"
+                } else {
+                    status.text = "माइक्रोफोन की अनुमति नहीं मिली"
+                }
+            }
+        }
+    }
+
     // FLOATING BUBBLE PERMISSION
 
     private fun startFloatingJarvis() {
@@ -194,6 +307,7 @@ class MainActivity : Activity(),
                 "पहले Display over other apps अनुमति चालू करें"
 
             try {
+
                 val intent = Intent(
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:$packageName")
@@ -204,7 +318,8 @@ class MainActivity : Activity(),
                     overlayRequest
                 )
 
-            } catch (e: Exception) {
+            } catch (_: Exception) {
+
                 say("Floating Window की सेटिंग नहीं खुल सकी")
             }
 
@@ -212,6 +327,7 @@ class MainActivity : Activity(),
         }
 
         try {
+
             startService(
                 Intent(
                     this,
@@ -219,19 +335,22 @@ class MainActivity : Activity(),
                 )
             )
 
-            status.text =
-                "Floating Jarvis शुरू हो गया 😎"
+            status.text = "Floating Jarvis शुरू हो गया 😎"
 
-        } catch (e: Exception) {
+        } catch (_: Exception) {
+
             say("Floating Jarvis शुरू नहीं हो सका")
         }
     }
 
+    // AUDIO PERMISSION
+
     private fun checkAudioPermission(): Boolean {
 
         if (
-            checkSelfPermission(Manifest.permission.RECORD_AUDIO)
-            == PackageManager.PERMISSION_GRANTED
+            checkSelfPermission(
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
         ) {
             return true
         }
@@ -249,26 +368,35 @@ class MainActivity : Activity(),
     private fun startJarvisVoice() {
 
         if (!checkAudioPermission()) {
+
             say("पहले माइक्रोफोन की अनुमति दें")
             return
         }
 
         try {
+
             val intent = Intent(
                 this,
                 JarvisVoiceService::class.java
             )
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (
+                Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.O
+            ) {
+
                 startForegroundService(intent)
+
             } else {
+
                 startService(intent)
             }
 
             status.text =
                 "Jarvis Voice Service शुरू हो रही है"
 
-        } catch (e: Exception) {
+        } catch (_: Exception) {
+
             say("Voice Service शुरू नहीं हो सकी")
         }
     }
@@ -276,7 +404,9 @@ class MainActivity : Activity(),
     // TEXT TO SPEECH
 
     override fun onInit(code: Int) {
+
         if (code == TextToSpeech.SUCCESS) {
+
             tts?.language = Locale("hi", "IN")
         }
     }
@@ -300,6 +430,7 @@ class MainActivity : Activity(),
         if (!checkAudioPermission()) return
 
         try {
+
             val intent = Intent(
                 RecognizerIntent.ACTION_RECOGNIZE_SPEECH
             ).apply {
@@ -320,9 +451,13 @@ class MainActivity : Activity(),
                 )
             }
 
-            startActivityForResult(intent, speechRequest)
+            startActivityForResult(
+                intent,
+                speechRequest
+            )
 
-        } catch (e: Exception) {
+        } catch (_: Exception) {
+
             say("Voice Recognition उपलब्ध नहीं है")
         }
     }
@@ -342,8 +477,11 @@ class MainActivity : Activity(),
         if (requestCode == overlayRequest) {
 
             if (Settings.canDrawOverlays(this)) {
+
                 startFloatingJarvis()
+
             } else {
+
                 status.text =
                     "Floating Jarvis के लिए अनुमति जरूरी है"
             }
@@ -355,6 +493,7 @@ class MainActivity : Activity(),
             requestCode == speechRequest &&
             resultCode == RESULT_OK
         ) {
+
             val spoken = data
                 ?.getStringArrayListExtra(
                     RecognizerIntent.EXTRA_RESULTS
@@ -374,15 +513,19 @@ class MainActivity : Activity(),
         val text = raw.trim()
 
         if (text.isBlank()) {
+
             say("कृपया कमांड दें")
             return
         }
 
         try {
+
             val result = manager.execute(text)
+
             say(result)
 
-        } catch (e: Exception) {
+        } catch (_: Exception) {
+
             say("कमांड चलाने में समस्या आई")
         }
     }
@@ -394,13 +537,19 @@ class MainActivity : Activity(),
         val service = JarvisAccessibility.active
 
         if (service == null) {
+
             say("पहले Jarvis Accessibility चालू करें")
             return
         }
 
         if (service.performGlobalAction(action)) {
-            say("जी सर, कमांड पूरी हुई")
+
+            say("जी सर, कमांड पूरी हुई"
+
+            )
+
         } else {
+
             say("यह एक्शन अभी उपलब्ध नहीं है")
         }
     }
@@ -410,10 +559,13 @@ class MainActivity : Activity(),
     private fun openSettings(action: String) {
 
         try {
+
             startActivity(Intent(action))
+
             say("सेटिंग खोल रहा हूँ")
 
-        } catch (e: Exception) {
+        } catch (_: Exception) {
+
             say("सेटिंग नहीं खुल सकी")
         }
     }
