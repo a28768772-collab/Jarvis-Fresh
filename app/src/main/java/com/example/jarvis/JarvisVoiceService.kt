@@ -22,8 +22,6 @@ class JarvisVoiceService : Service(),
         const val WAKE = "com.example.jarvis.WAKE_VOICE"
 
         const val EXTRA_DIRECT_LISTEN = "direct_listen"
-
-        // Bubble और Voice Service के बीच संदेश
         const val BUBBLE_STATE = "com.example.jarvis.BUBBLE_STATE"
 
         private const val CHANNEL = "jarvis_voice"
@@ -39,7 +37,6 @@ class JarvisVoiceService : Service(),
     private var running = false
     private var listening = false
     private var speaking = false
-    private var sleeping = true
     private var waitingForCommand = false
     private var stopping = false
 
@@ -72,45 +69,13 @@ class JarvisVoiceService : Service(),
 
         when (intent?.action) {
 
-            STOP -> {
-                stopJarvis()
+            STOP, SLEEP -> {
+                enterSleepMode()
                 return START_NOT_STICKY
-            }
-
-            SLEEP -> {
-                if (running) enterSleepMode()
-                return START_NOT_STICKY
-            }
-
-            WAKE -> {
-                if (running) {
-                    sleeping = false
-                    waitingForCommand = true
-                    notifyBubble("awake")
-                    listenAgain(300)
-                    return START_NOT_STICKY
-                }
             }
         }
 
-        if (running) {
-
-            if (
-                intent?.getBooleanExtra(
-                    EXTRA_DIRECT_LISTEN,
-                    false
-                ) == true
-            ) {
-                sleeping = false
-                waitingForCommand = true
-                notifyBubble("awake")
-                listenAgain(300)
-            }
-
-            return START_NOT_STICKY
-        }
-
-        if (stopping) return START_NOT_STICKY
+        if (running || stopping) return START_NOT_STICKY
 
         if (
             checkSelfPermission(Manifest.permission.RECORD_AUDIO)
@@ -147,8 +112,8 @@ class JarvisVoiceService : Service(),
         )
 
         val notification = Notification.Builder(this, CHANNEL)
-            .setContentTitle("JARVIS ULTIMATE 3.5")
-            .setContentText("Jarvis voice control active")
+            .setContentTitle("JARVIS ULTIMATE 3.6")
+            .setContentText("Jarvis microphone active")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentIntent(pending)
             .addAction(
@@ -188,28 +153,25 @@ class JarvisVoiceService : Service(),
         running = true
         stopping = false
 
-        val directListen = intent?.getBooleanExtra(
+        waitingForCommand = intent?.getBooleanExtra(
             EXTRA_DIRECT_LISTEN,
             false
         ) == true
 
-        sleeping = !directListen
-        waitingForCommand = directListen
-
-        if (directListen) {
+        if (waitingForCommand) {
             notifyBubble("awake")
         }
 
         if (SpeechRecognizer.isRecognitionAvailable(this)) {
 
             recognizer = SpeechRecognizer.createSpeechRecognizer(this)
-
             recognizer?.setRecognitionListener(this)
 
             listenAgain(700)
 
         } else {
-            stopJarvis()
+
+            enterSleepMode()
         }
 
         return START_NOT_STICKY
@@ -223,8 +185,6 @@ class JarvisVoiceService : Service(),
             .replace(Regex("\\s+"), " ")
     }
 
-    // Bubble को Awake या Sleep की सूचना भेजें।
-
     private fun notifyBubble(state: String) {
 
         try {
@@ -234,17 +194,12 @@ class JarvisVoiceService : Service(),
 
                     setPackage(packageName)
 
-                    putExtra(
-                        "state",
-                        state
-                    )
+                    putExtra("state", state)
                 }
             )
 
         } catch (_: Exception) {}
     }
-
-    // अलग-अलग उच्चारण में Stop पहचानें।
 
     private fun isStopCommand(raw: String): Boolean {
 
@@ -279,65 +234,41 @@ class JarvisVoiceService : Service(),
         )
     }
 
-    // Jarvis को Sleep Mode में डालें।
+    // FULL SLEEP: Mic और Voice Service बंद।
 
     private fun enterSleepMode() {
 
-        sleeping = true
+        if (stopping) return
+
+        stopping = true
+        running = false
         waitingForCommand = false
+        listening = false
         speaking = false
+
+        // Bubble को 😴 दिखाने का संदेश।
+        notifyBubble("sleep")
 
         nextListen?.let {
             handler.removeCallbacks(it)
         }
 
         nextListen = null
-
-        try {
-            tts?.stop()
-        } catch (_: Exception) {}
-
-        if (listening) {
-
-            try {
-                recognizer?.cancel()
-            } catch (_: Exception) {}
-
-            listening = false
-        }
-
-        // Emoji को 😴 करने का संदेश
-        notifyBubble("sleep")
-
-        listenAgain(700)
-    }
-
-    // Voice Service पूरी तरह बंद करें।
-
-    private fun stopJarvis() {
-
-        if (stopping) return
-
-        stopping = true
-        running = false
-        sleeping = true
-        waitingForCommand = false
-        listening = false
-        speaking = false
-
-        notifyBubble("sleep")
-
         handler.removeCallbacksAndMessages(null)
-        nextListen = null
 
         try {
             recognizer?.cancel()
+            recognizer?.destroy()
         } catch (_: Exception) {}
+
+        recognizer = null
 
         try {
             tts?.stop()
         } catch (_: Exception) {}
 
+        // Foreground Service और Microphone Session बंद।
+        stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
@@ -411,9 +342,9 @@ class JarvisVoiceService : Service(),
             return
         }
 
-        // Stop को सबसे पहले पहचानें।
-
+        // Stop Command को सबसे पहले पहचानें।
         if (isStopCommand(heard)) {
+
             enterSleepMode()
             return
         }
@@ -439,36 +370,7 @@ class JarvisVoiceService : Service(),
             heard.contains(it)
         }
 
-        // Sleep Mode में सिर्फ Wake Word सुनें।
-
-        if (sleeping) {
-
-            if (wake != null) {
-
-                sleeping = false
-                notifyBubble("awake")
-
-                val remaining = heard.substringAfter(wake).trim()
-
-                if (remaining.isNotEmpty()) {
-
-                    executeCommand(remaining)
-
-                } else {
-
-                    waitingForCommand = true
-                    speak("जी सर, बताइए")
-                }
-
-            } else {
-                listenAgain()
-            }
-
-            return
-        }
-
-        // Greeting के बाद Direct Command।
-
+        // Bubble Greeting के बाद Direct Command।
         if (waitingForCommand) {
 
             waitingForCommand = false
@@ -483,18 +385,19 @@ class JarvisVoiceService : Service(),
                     speak("जी सर, बताइए")
 
                 } else {
+
                     executeCommand(remaining)
                 }
 
             } else {
+
                 executeCommand(heard)
             }
 
             return
         }
 
-        // Active Mode में सामान्य कमांड।
-
+        // सामान्य Voice Start में Wake Word जरूरी।
         if (wake != null) {
 
             val remaining = heard.substringAfter(wake).trim()
@@ -510,7 +413,8 @@ class JarvisVoiceService : Service(),
             }
 
         } else {
-            executeCommand(heard)
+
+            listenAgain()
         }
     }
 
@@ -541,7 +445,6 @@ class JarvisVoiceService : Service(),
         try {
 
             val result = manager.execute(command)
-
             speak(result)
 
         } catch (_: Exception) {
@@ -552,7 +455,7 @@ class JarvisVoiceService : Service(),
 
     private fun speak(message: String) {
 
-        if (!running || stopping || sleeping) return
+        if (!running || stopping) return
 
         speaking = true
 
@@ -646,7 +549,7 @@ class JarvisVoiceService : Service(),
 
             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
 
-                stopJarvis()
+                enterSleepMode()
                 return
             }
 
