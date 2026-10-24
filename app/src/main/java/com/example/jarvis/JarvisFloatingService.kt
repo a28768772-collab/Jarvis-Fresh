@@ -1,8 +1,10 @@
-
 package com.example.jarvis
 
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
@@ -41,14 +43,52 @@ class JarvisFloatingService : Service(),
     private var speaking = false
     private var greetingPending = false
     private var animationFrame = 0
+    private var receiverRegistered = false
+
+    // Voice Service से Sleep/Awake संदेश प्राप्त करें।
+    private val stateReceiver = object : BroadcastReceiver() {
+
+        override fun onReceive(
+            context: Context?,
+            intent: Intent?
+        ) {
+
+            when (intent?.getStringExtra("state")) {
+
+                "sleep" -> {
+                    showSleepState()
+                }
+
+                "awake" -> {
+                    active = true
+
+                    if (!speaking) {
+                        bubble?.apply {
+                            text = "😎"
+                            scaleX = 1f
+                            scaleY = 1f
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     private val animation = object : Runnable {
+
         override fun run() {
+
             if (!speaking) return
 
-            val faces = arrayOf("😮", "😃", "😮", "😊")
+            val faces = arrayOf(
+                "😮",
+                "😃",
+                "😮",
+                "😊"
+            )
 
             bubble?.apply {
+
                 text = faces[animationFrame % faces.size]
 
                 val scale = if (animationFrame % 2 == 0) {
@@ -62,16 +102,42 @@ class JarvisFloatingService : Service(),
             }
 
             animationFrame++
+
             handler.postDelayed(this, 220)
         }
     }
 
     override fun onCreate() {
+
         super.onCreate()
 
         windowManager = getSystemService(
             WINDOW_SERVICE
         ) as WindowManager
+
+        // Voice Service का Broadcast सुनें।
+        val filter = IntentFilter(
+            JarvisVoiceService.BUBBLE_STATE
+        )
+
+        if (Build.VERSION.SDK_INT >= 33) {
+
+            registerReceiver(
+                stateReceiver,
+                filter,
+                Context.RECEIVER_NOT_EXPORTED
+            )
+
+        } else {
+
+            @Suppress("DEPRECATION")
+            registerReceiver(
+                stateReceiver,
+                filter
+            )
+        }
+
+        receiverRegistered = true
 
         tts = TextToSpeech(this, this)
 
@@ -90,48 +156,73 @@ class JarvisFloatingService : Service(),
     ): Int {
 
         if (!Settings.canDrawOverlays(this)) {
+
             stopSelf()
+
             return START_NOT_STICKY
         }
 
-        if (bubble == null) showBubble()
+        if (bubble == null) {
+            showBubble()
+        }
 
         return START_NOT_STICKY
     }
 
     private fun overlayType(): Int {
+
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+
         } else {
+
             @Suppress("DEPRECATION")
             WindowManager.LayoutParams.TYPE_PHONE
         }
     }
 
     private fun Int.dp(): Int {
-        return (this * resources.displayMetrics.density).toInt()
+
+        return (
+            this * resources.displayMetrics.density
+        ).toInt()
     }
 
     private fun background(
         color: Int,
         borderColor: Int
     ): GradientDrawable {
+
         return GradientDrawable().apply {
+
             shape = GradientDrawable.RECTANGLE
+
             cornerRadius = 45f
+
             setColor(color)
-            setStroke(3.dp(), borderColor)
+
+            setStroke(
+                3.dp(),
+                borderColor
+            )
         }
     }
 
     private fun showBubble() {
+
         if (bubble != null) return
+
         if (!Settings.canDrawOverlays(this)) return
 
         val emoji = TextView(this).apply {
+
             text = "😴"
+
             textSize = 35f
+
             gravity = Gravity.CENTER
+
             elevation = 12f
 
             background = background(
@@ -147,15 +238,20 @@ class JarvisFloatingService : Service(),
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
+
             gravity = Gravity.TOP or Gravity.START
+
             x = 25.dp()
+
             y = 180.dp()
         }
 
         var startX = 0
         var startY = 0
+
         var touchX = 0f
         var touchY = 0f
+
         var moved = false
 
         emoji.setOnTouchListener { _, event ->
@@ -163,31 +259,47 @@ class JarvisFloatingService : Service(),
             when (event.action) {
 
                 MotionEvent.ACTION_DOWN -> {
+
                     startX = params.x
                     startY = params.y
+
                     touchX = event.rawX
                     touchY = event.rawY
+
                     moved = false
+
                     true
                 }
 
                 MotionEvent.ACTION_MOVE -> {
-                    val dx = (event.rawX - touchX).toInt()
-                    val dy = (event.rawY - touchY).toInt()
 
-                    if (abs(dx) > 10 || abs(dy) > 10) {
+                    val dx = (
+                        event.rawX - touchX
+                    ).toInt()
+
+                    val dy = (
+                        event.rawY - touchY
+                    ).toInt()
+
+                    if (
+                        abs(dx) > 10 ||
+                        abs(dy) > 10
+                    ) {
                         moved = true
                     }
 
                     if (moved) {
+
                         params.x = startX + dx
                         params.y = startY + dy
 
                         try {
+
                             windowManager.updateViewLayout(
                                 emoji,
                                 params
                             )
+
                         } catch (_: Exception) {}
 
                         hideMenu()
@@ -197,7 +309,11 @@ class JarvisFloatingService : Service(),
                 }
 
                 MotionEvent.ACTION_UP -> {
-                    if (!moved) onBubbleTap()
+
+                    if (!moved) {
+                        onBubbleTap()
+                    }
+
                     true
                 }
 
@@ -206,27 +322,42 @@ class JarvisFloatingService : Service(),
         }
 
         try {
-            windowManager.addView(emoji, params)
+
+            windowManager.addView(
+                emoji,
+                params
+            )
+
             bubble = emoji
+
         } catch (_: Exception) {
+
             stopSelf()
         }
     }
 
     private fun onBubbleTap() {
 
+        // Sleep Emoji पर टैप करने से Jarvis फिर शुरू होगा।
         if (!active) {
+
             active = true
+
             bubble?.text = "😊"
+
             greetUser()
+
             return
         }
 
         if (speaking) return
 
         if (menu == null) {
+
             showMenu()
+
         } else {
+
             hideMenu()
         }
     }
@@ -240,10 +371,13 @@ class JarvisFloatingService : Service(),
         }
 
         greetingPending = false
+
         speaking = true
+
         animationFrame = 0
 
         handler.removeCallbacks(animation)
+
         handler.post(animation)
 
         val result = tts?.speak(
@@ -265,9 +399,15 @@ class JarvisFloatingService : Service(),
         speaking = false
 
         bubble?.apply {
+
             scaleX = 1f
             scaleY = 1f
-            text = if (active) "😎" else "😴"
+
+            text = if (active) {
+                "😎"
+            } else {
+                "😴"
+            }
         }
 
         if (active) {
@@ -275,16 +415,16 @@ class JarvisFloatingService : Service(),
         }
     }
 
-    // UPDATED: DIRECT LISTENING AFTER BUBBLE GREETING
-
     private fun startVoiceService() {
 
         try {
+
             val intent = Intent(
                 this,
                 JarvisVoiceService::class.java
             ).apply {
 
+                // Greeting के बाद सीधे कमांड सुनें।
                 putExtra(
                     JarvisVoiceService.EXTRA_DIRECT_LISTEN,
                     true
@@ -292,14 +432,18 @@ class JarvisFloatingService : Service(),
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
                 startForegroundService(intent)
+
             } else {
+
                 startService(intent)
             }
 
         } catch (_: Exception) {
 
             active = false
+
             bubble?.text = "😕"
 
             Toast.makeText(
@@ -310,10 +454,13 @@ class JarvisFloatingService : Service(),
         }
     }
 
-    private fun enterSleepMode() {
+    // केवल Emoji और Bubble की स्थिति Sleep करें।
+    private fun showSleepState() {
 
         active = false
+
         greetingPending = false
+
         speaking = false
 
         handler.removeCallbacks(animation)
@@ -322,15 +469,10 @@ class JarvisFloatingService : Service(),
             tts?.stop()
         } catch (_: Exception) {}
 
-        stopService(
-            Intent(
-                this,
-                JarvisVoiceService::class.java
-            )
-        )
-
         bubble?.apply {
+
             text = "😴"
+
             scaleX = 1f
             scaleY = 1f
         }
@@ -338,11 +480,34 @@ class JarvisFloatingService : Service(),
         hideMenu()
     }
 
+    // Menu के Sleep बटन के लिए।
+    private fun enterSleepMode() {
+
+        showSleepState()
+
+        try {
+
+            startService(
+                Intent(
+                    this,
+                    JarvisVoiceService::class.java
+                ).setAction(
+                    JarvisVoiceService.SLEEP
+                )
+            )
+
+        } catch (_: Exception) {}
+    }
+
     override fun onInit(status: Int) {
 
         if (status == TextToSpeech.SUCCESS) {
 
-            tts?.language = Locale("hi", "IN")
+            tts?.language = Locale(
+                "hi",
+                "IN"
+            )
+
             ttsReady = true
 
             tts?.setOnUtteranceProgressListener(
@@ -351,8 +516,11 @@ class JarvisFloatingService : Service(),
                     override fun onStart(id: String?) {}
 
                     override fun onDone(id: String?) {
+
                         if (id == "jarvis_bubble_greeting") {
+
                             handler.post {
+
                                 if (active && speaking) {
                                     finishGreeting()
                                 }
@@ -361,8 +529,11 @@ class JarvisFloatingService : Service(),
                     }
 
                     override fun onError(id: String?) {
+
                         if (id == "jarvis_bubble_greeting") {
+
                             handler.post {
+
                                 if (active && speaking) {
                                     finishGreeting()
                                 }
@@ -373,7 +544,10 @@ class JarvisFloatingService : Service(),
             )
 
             if (greetingPending && active) {
-                handler.post { greetUser() }
+
+                handler.post {
+                    greetUser()
+                }
             }
 
         } else {
@@ -381,16 +555,22 @@ class JarvisFloatingService : Service(),
             ttsReady = false
 
             if (greetingPending && active) {
+
                 greetingPending = false
-                handler.post { finishGreeting() }
+
+                handler.post {
+                    finishGreeting()
+                }
             }
         }
     }
 
     private fun showMenu() {
+
         if (menu != null) return
 
         val panel = LinearLayout(this).apply {
+
             orientation = LinearLayout.VERTICAL
 
             setPadding(
@@ -409,19 +589,39 @@ class JarvisFloatingService : Service(),
         }
 
         val heading = TextView(this).apply {
+
             text = "😎  JARVIS"
+
             textSize = 21f
+
             setTextColor(Color.WHITE)
-            setTypeface(null, Typeface.BOLD)
+
+            setTypeface(
+                null,
+                Typeface.BOLD
+            )
+
             gravity = Gravity.CENTER
         }
 
         val message = TextView(this).apply {
+
             text = "जी सर, आदेश दीजिए!"
+
             textSize = 15f
-            setTextColor(Color.rgb(160, 222, 255))
+
+            setTextColor(
+                Color.rgb(160, 222, 255)
+            )
+
             gravity = Gravity.CENTER
-            setPadding(0, 12.dp(), 0, 12.dp())
+
+            setPadding(
+                0,
+                12.dp(),
+                0,
+                12.dp()
+            )
         }
 
         panel.addView(heading)
@@ -431,41 +631,70 @@ class JarvisFloatingService : Service(),
             title: String,
             action: () -> Unit
         ) {
+
             panel.addView(
                 Button(this).apply {
+
                     text = title
+
                     isAllCaps = false
-                    setOnClickListener { action() }
+
+                    setOnClickListener {
+                        action()
+                    }
                 }
             )
         }
 
         addButton("🎙 Open Jarvis") {
+
             val intent = Intent(
                 this,
                 MainActivity::class.java
             ).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK
+                )
+
+                addFlags(
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+                )
             }
 
             try {
+
                 startActivity(intent)
+
             } catch (_: Exception) {}
 
             hideMenu()
         }
 
         addButton("😴 Sleep Mode") {
+
             enterSleepMode()
         }
 
         addButton("➖ Minimize") {
+
             hideMenu()
         }
 
         addButton("❌ Close Bubble") {
-            enterSleepMode()
+
+            // Close करने पर Voice Service भी बंद होगी।
+            try {
+
+                stopService(
+                    Intent(
+                        this,
+                        JarvisVoiceService::class.java
+                    )
+                )
+
+            } catch (_: Exception) {}
+
             stopSelf()
         }
 
@@ -476,13 +705,21 @@ class JarvisFloatingService : Service(),
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
+
             gravity = Gravity.CENTER
         }
 
         try {
-            windowManager.addView(panel, params)
+
+            windowManager.addView(
+                panel,
+                params
+            )
+
             menu = panel
+
         } catch (_: Exception) {
+
             menu = null
         }
     }
@@ -490,8 +727,11 @@ class JarvisFloatingService : Service(),
     private fun hideMenu() {
 
         menu?.let {
+
             try {
+
                 windowManager.removeView(it)
+
             } catch (_: Exception) {}
         }
 
@@ -508,19 +748,35 @@ class JarvisFloatingService : Service(),
 
         handler.removeCallbacksAndMessages(null)
 
+        if (receiverRegistered) {
+
+            try {
+
+                unregisterReceiver(stateReceiver)
+
+            } catch (_: Exception) {}
+
+            receiverRegistered = false
+        }
+
         hideMenu()
 
         bubble?.let {
+
             try {
+
                 windowManager.removeView(it)
+
             } catch (_: Exception) {}
         }
 
         bubble = null
 
         try {
+
             tts?.stop()
             tts?.shutdown()
+
         } catch (_: Exception) {}
 
         tts = null
