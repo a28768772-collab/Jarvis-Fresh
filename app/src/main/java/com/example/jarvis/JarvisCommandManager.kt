@@ -12,6 +12,8 @@ class JarvisCommandManager(
     private val context: Context
 ) {
 
+    private val offlineBrain = JarvisOfflineBrain()
+
     fun execute(raw: String): String {
 
         val text = raw.trim().lowercase(Locale.ROOT)
@@ -464,10 +466,12 @@ class JarvisCommandManager(
                 }
             }
 
-            // UNKNOWN COMMAND
+            // OFFLINE AI BRAIN
 
             else -> {
-                "यह कमांड अभी उपलब्ध नहीं है"
+
+                offlineBrain.answer(raw)
+                    ?: "यह सवाल मेरी ऑफलाइन जानकारी में अभी उपलब्ध नहीं है"
             }
         }
     }
