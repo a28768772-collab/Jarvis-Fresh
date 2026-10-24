@@ -31,6 +31,7 @@ class JarvisVoiceService : Service(),
     private var listening = false
     private var speaking = false
     private var waitingForCommand = false
+    private var stopping = false
 
     private var nextListen: Runnable? = null
 
@@ -60,11 +61,11 @@ class JarvisVoiceService : Service(),
     ): Int {
 
         if (intent?.action == STOP) {
-            stopSelf()
+            stopJarvis()
             return START_NOT_STICKY
         }
 
-        if (running) return START_NOT_STICKY
+        if (running || stopping) return START_NOT_STICKY
 
         if (
             checkSelfPermission(Manifest.permission.RECORD_AUDIO)
@@ -74,10 +75,7 @@ class JarvisVoiceService : Service(),
             return START_NOT_STICKY
         }
 
-        val openIntent = Intent(
-            this,
-            MainActivity::class.java
-        )
+        val openIntent = Intent(this, MainActivity::class.java)
 
         val pending = PendingIntent.getActivity(
             this,
@@ -131,6 +129,7 @@ class JarvisVoiceService : Service(),
         }
 
         running = true
+        stopping = false
         waitingForCommand = false
 
         if (SpeechRecognizer.isRecognitionAvailable(this)) {
@@ -138,20 +137,72 @@ class JarvisVoiceService : Service(),
             recognizer?.setRecognitionListener(this)
             listenAgain(700)
         } else {
-            speak("वॉइस रिकग्निशन उपलब्ध नहीं है")
+            stopJarvis()
         }
 
         return START_NOT_STICKY
     }
 
+    private fun isStopCommand(raw: String): Boolean {
+        val text = raw.lowercase(Locale.ROOT)
+            .trim()
+            .replace(Regex("[,.!?।]+"), "")
+            .replace(Regex("\\s+"), " ")
+
+        return text in listOf(
+            "jarvis stop",
+            "hey jarvis stop",
+            "stop jarvis",
+            "जार्विस स्टॉप",
+            "जारविस स्टॉप",
+            "हे जार्विस स्टॉप",
+            "जार्विस बंद हो जाओ",
+            "जारविस बंद हो जाओ",
+            "हे जार्विस बंद हो जाओ",
+            "जार्विस सुनना बंद करो",
+            "जारविस सुनना बंद करो",
+            "stop listening",
+            "jarvis stop listening",
+            "जार्विस चुप हो जाओ"
+        )
+    }
+
+    private fun stopJarvis() {
+        if (stopping) return
+
+        stopping = true
+        running = false
+        waitingForCommand = false
+        listening = false
+        speaking = false
+
+        nextListen?.let { handler.removeCallbacks(it) }
+        nextListen = null
+        handler.removeCallbacksAndMessages(null)
+
+        try {
+            recognizer?.cancel()
+        } catch (_: Exception) {}
+
+        try {
+            tts?.stop()
+        } catch (_: Exception) {}
+
+        stopSelf()
+    }
+
     private fun listenAgain(delay: Long = 500) {
 
-        if (!running || speaking || listening) return
+        if (!running || stopping || speaking || listening) return
 
         nextListen?.let { handler.removeCallbacks(it) }
 
         val task = Runnable {
-            if (!running || speaking || listening) return@Runnable
+            nextListen = null
+
+            if (!running || stopping || speaking || listening) {
+                return@Runnable
+            }
 
             try {
                 listening = true
@@ -191,6 +242,8 @@ class JarvisVoiceService : Service(),
 
         listening = false
 
+        if (!running || stopping) return
+
         val heard = results
             ?.getStringArrayList(
                 SpeechRecognizer.RESULTS_RECOGNITION
@@ -202,6 +255,12 @@ class JarvisVoiceService : Service(),
 
         if (heard.isBlank()) {
             listenAgain()
+            return
+        }
+
+        // STOP को बाकी सभी कमांड से पहले पहचानें।
+        if (isStopCommand(heard)) {
+            stopJarvis()
             return
         }
 
@@ -217,6 +276,7 @@ class JarvisVoiceService : Service(),
             "हे जारविस",
             "हाय जार्विस",
             "जार्विस",
+            "जारविस",
             "jarvis"
         )
 
@@ -227,6 +287,15 @@ class JarvisVoiceService : Service(),
         if (wake != null) {
 
             val remaining = heard.substringAfter(wake).trim()
+
+            if (isStopCommand(remaining) ||
+                remaining == "stop" ||
+                remaining == "स्टॉप" ||
+                remaining == "बंद हो जाओ"
+            ) {
+                stopJarvis()
+                return
+            }
 
             if (remaining.isNotEmpty()) {
                 executeCommand(remaining)
@@ -240,9 +309,17 @@ class JarvisVoiceService : Service(),
         }
     }
 
-    // ALL COMMANDS THROUGH COMMAND MANAGER
-
     private fun executeCommand(command: String) {
+
+        if (!running || stopping) return
+
+        if (isStopCommand(command) ||
+            command.trim() == "स्टॉप" ||
+            command.trim().equals("stop", ignoreCase = true)
+        ) {
+            stopJarvis()
+            return
+        }
 
         if (command.isBlank()) {
             speak("कृपया कमांड बताइए")
@@ -258,6 +335,8 @@ class JarvisVoiceService : Service(),
     }
 
     private fun speak(message: String) {
+
+        if (!running || stopping) return
 
         speaking = true
 
@@ -305,15 +384,19 @@ class JarvisVoiceService : Service(),
 
                     override fun onDone(id: String?) {
                         handler.post {
-                            speaking = false
-                            listenAgain(500)
+                            if (!stopping && running) {
+                                speaking = false
+                                listenAgain(500)
+                            }
                         }
                     }
 
                     override fun onError(id: String?) {
                         handler.post {
-                            speaking = false
-                            listenAgain(1200)
+                            if (!stopping && running) {
+                                speaking = false
+                                listenAgain(1200)
+                            }
                         }
                     }
                 }
@@ -325,7 +408,7 @@ class JarvisVoiceService : Service(),
 
         listening = false
 
-        if (!running || speaking) return
+        if (!running || stopping || speaking) return
 
         val delay = when (error) {
 
@@ -333,7 +416,7 @@ class JarvisVoiceService : Service(),
             SpeechRecognizer.ERROR_CLIENT -> 2500L
 
             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
-                stopSelf()
+                stopJarvis()
                 return
             }
 
@@ -362,6 +445,7 @@ class JarvisVoiceService : Service(),
     override fun onDestroy() {
 
         running = false
+        stopping = true
         listening = false
         speaking = false
 
@@ -372,8 +456,14 @@ class JarvisVoiceService : Service(),
             recognizer?.destroy()
         } catch (_: Exception) {}
 
-        tts?.stop()
-        tts?.shutdown()
+        recognizer = null
+
+        try {
+            tts?.stop()
+            tts?.shutdown()
+        } catch (_: Exception) {}
+
+        tts = null
 
         super.onDestroy()
     }
