@@ -7,27 +7,63 @@ import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.provider.Settings
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.view.Gravity
 import android.view.MotionEvent
-import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import java.util.Locale
+import kotlin.math.abs
 
-class JarvisFloatingService : Service() {
+class JarvisFloatingService : Service(),
+    TextToSpeech.OnInitListener {
 
     private lateinit var windowManager: WindowManager
+
+    private val handler = Handler(Looper.getMainLooper())
 
     private var bubble: TextView? = null
     private var menu: LinearLayout? = null
 
-    private var bubbleParams: WindowManager.LayoutParams? = null
-    private var menuParams: WindowManager.LayoutParams? = null
+    private var tts: TextToSpeech? = null
+    private var ttsReady = false
 
     private var active = false
+    private var speaking = false
+    private var greetingPending = false
+    private var animationFrame = 0
+
+    private val animation = object : Runnable {
+        override fun run() {
+            if (!speaking) return
+
+            val faces = arrayOf("😮", "😃", "😮", "😊")
+
+            bubble?.apply {
+                text = faces[animationFrame % faces.size]
+
+                val scale = if (animationFrame % 2 == 0) {
+                    1.12f
+                } else {
+                    0.94f
+                }
+
+                scaleX = scale
+                scaleY = scale
+            }
+
+            animationFrame++
+            handler.postDelayed(this, 220)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -35,6 +71,8 @@ class JarvisFloatingService : Service() {
         windowManager = getSystemService(
             WINDOW_SERVICE
         ) as WindowManager
+
+        tts = TextToSpeech(this, this)
 
         if (!Settings.canDrawOverlays(this)) {
             stopSelf()
@@ -49,14 +87,13 @@ class JarvisFloatingService : Service() {
         flags: Int,
         startId: Int
     ): Int {
+
         if (!Settings.canDrawOverlays(this)) {
             stopSelf()
             return START_NOT_STICKY
         }
 
-        if (bubble == null) {
-            showBubble()
-        }
+        if (bubble == null) showBubble()
 
         return START_NOT_STICKY
     }
@@ -70,15 +107,19 @@ class JarvisFloatingService : Service() {
         }
     }
 
-    private fun roundedBackground(
+    private fun Int.dp(): Int {
+        return (this * resources.displayMetrics.density).toInt()
+    }
+
+    private fun background(
         color: Int,
-        stroke: Int
+        borderColor: Int
     ): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = 45f
             setColor(color)
-            setStroke(3, stroke)
+            setStroke(3.dp(), borderColor)
         }
     }
 
@@ -92,7 +133,7 @@ class JarvisFloatingService : Service() {
             gravity = Gravity.CENTER
             elevation = 12f
 
-            background = roundedBackground(
+            background = background(
                 Color.rgb(29, 31, 46),
                 Color.rgb(112, 89, 210)
             )
@@ -123,10 +164,8 @@ class JarvisFloatingService : Service() {
                 MotionEvent.ACTION_DOWN -> {
                     startX = params.x
                     startY = params.y
-
                     touchX = event.rawX
                     touchY = event.rawY
-
                     moved = false
                     true
                 }
@@ -135,9 +174,7 @@ class JarvisFloatingService : Service() {
                     val dx = (event.rawX - touchX).toInt()
                     val dy = (event.rawY - touchY).toInt()
 
-                    if (kotlin.math.abs(dx) > 10 ||
-                        kotlin.math.abs(dy) > 10
-                    ) {
+                    if (abs(dx) > 10 || abs(dy) > 10) {
                         moved = true
                     }
 
@@ -159,9 +196,7 @@ class JarvisFloatingService : Service() {
                 }
 
                 MotionEvent.ACTION_UP -> {
-                    if (!moved) {
-                        onBubbleTap()
-                    }
+                    if (!moved) onBubbleTap()
                     true
                 }
 
@@ -172,7 +207,6 @@ class JarvisFloatingService : Service() {
         try {
             windowManager.addView(emoji, params)
             bubble = emoji
-            bubbleParams = params
         } catch (_: Exception) {
             stopSelf()
         }
@@ -182,16 +216,167 @@ class JarvisFloatingService : Service() {
 
         if (!active) {
             active = true
-            bubble?.text = "😎"
-
-            // Sleep से Active होने पर मेनू नहीं खुलेगा।
+            bubble?.text = "😊"
+            greetUser()
             return
         }
 
-        if (menu != null) {
-            hideMenu()
-        } else {
+        if (speaking) return
+
+        if (menu == null) {
             showMenu()
+        } else {
+            hideMenu()
+        }
+    }
+
+    private fun greetUser() {
+
+        greetingPending = true
+
+        if (!ttsReady) {
+            // TTS तैयार होने पर greeting शुरू होगी।
+            return
+        }
+
+        greetingPending = false
+        speaking = true
+        animationFrame = 0
+
+        handler.removeCallbacks(animation)
+        handler.post(animation)
+
+        val result = tts?.speak(
+            "Hi sir, मैं आपकी क्या सहायता करूँ?",
+            TextToSpeech.QUEUE_FLUSH,
+            null,
+            "jarvis_bubble_greeting"
+        )
+
+        if (result != TextToSpeech.SUCCESS) {
+            finishGreeting()
+        }
+    }
+
+    private fun finishGreeting() {
+        handler.removeCallbacks(animation)
+
+        speaking = false
+
+        bubble?.apply {
+            scaleX = 1f
+            scaleY = 1f
+            text = if (active) "😎" else "😴"
+        }
+
+        if (active) {
+            startVoiceService()
+        }
+    }
+
+    private fun startVoiceService() {
+
+        try {
+            val intent = Intent(
+                this,
+                JarvisVoiceService::class.java
+            )
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+
+        } catch (_: Exception) {
+
+            // कुछ Android वर्जन Background Microphone
+            // Service को Overlay से शुरू नहीं करने देते।
+
+            active = false
+            bubble?.text = "😕"
+
+            Toast.makeText(
+                this,
+                "Jarvis Voice शुरू नहीं हुई। ऐप खोलकर START HEY JARVIS दबाएँ।",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    private fun enterSleepMode() {
+
+        active = false
+        greetingPending = false
+        speaking = false
+
+        handler.removeCallbacks(animation)
+
+        try {
+            tts?.stop()
+        } catch (_: Exception) {}
+
+        stopService(
+            Intent(
+                this,
+                JarvisVoiceService::class.java
+            )
+        )
+
+        bubble?.apply {
+            text = "😴"
+            scaleX = 1f
+            scaleY = 1f
+        }
+
+        hideMenu()
+    }
+
+    override fun onInit(status: Int) {
+
+        if (status == TextToSpeech.SUCCESS) {
+
+            tts?.language = Locale("hi", "IN")
+            ttsReady = true
+
+            tts?.setOnUtteranceProgressListener(
+                object : UtteranceProgressListener() {
+
+                    override fun onStart(id: String?) {}
+
+                    override fun onDone(id: String?) {
+                        if (id == "jarvis_bubble_greeting") {
+                            handler.post {
+                                if (active && speaking) {
+                                    finishGreeting()
+                                }
+                            }
+                        }
+                    }
+
+                    override fun onError(id: String?) {
+                        if (id == "jarvis_bubble_greeting") {
+                            handler.post {
+                                if (active && speaking) {
+                                    finishGreeting()
+                                }
+                            }
+                        }
+                    }
+                }
+            )
+
+            if (greetingPending && active) {
+                handler.post { greetUser() }
+            }
+
+        } else {
+            ttsReady = false
+
+            if (greetingPending && active) {
+                greetingPending = false
+                handler.post { finishGreeting() }
+            }
         }
     }
 
@@ -200,6 +385,7 @@ class JarvisFloatingService : Service() {
 
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+
             setPadding(
                 16.dp(),
                 16.dp(),
@@ -207,7 +393,7 @@ class JarvisFloatingService : Service() {
                 16.dp()
             )
 
-            background = roundedBackground(
+            background = background(
                 Color.rgb(27, 29, 44),
                 Color.rgb(92, 181, 255)
             )
@@ -238,13 +424,13 @@ class JarvisFloatingService : Service() {
             title: String,
             action: () -> Unit
         ) {
-            val button = Button(this).apply {
-                text = title
-                isAllCaps = false
-                setOnClickListener { action() }
-            }
-
-            panel.addView(button)
+            panel.addView(
+                Button(this).apply {
+                    text = title
+                    isAllCaps = false
+                    setOnClickListener { action() }
+                }
+            )
         }
 
         addButton("🎙 Open Jarvis") {
@@ -256,14 +442,15 @@ class JarvisFloatingService : Service() {
                 addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
 
-            startActivity(intent)
+            try {
+                startActivity(intent)
+            } catch (_: Exception) {}
+
             hideMenu()
         }
 
         addButton("😴 Sleep Mode") {
-            active = false
-            bubble?.text = "😴"
-            hideMenu()
+            enterSleepMode()
         }
 
         addButton("➖ Minimize") {
@@ -271,6 +458,7 @@ class JarvisFloatingService : Service() {
         }
 
         addButton("❌ Close Bubble") {
+            enterSleepMode()
             stopSelf()
         }
 
@@ -287,13 +475,13 @@ class JarvisFloatingService : Service() {
         try {
             windowManager.addView(panel, params)
             menu = panel
-            menuParams = params
         } catch (_: Exception) {
             menu = null
         }
     }
 
     private fun hideMenu() {
+
         menu?.let {
             try {
                 windowManager.removeView(it)
@@ -301,18 +489,18 @@ class JarvisFloatingService : Service() {
         }
 
         menu = null
-        menuParams = null
-    }
-
-    private fun Int.dp(): Int {
-        return (
-            this * resources.displayMetrics.density
-        ).toInt()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+
+        active = false
+        speaking = false
+        greetingPending = false
+
+        handler.removeCallbacksAndMessages(null)
+
         hideMenu()
 
         bubble?.let {
@@ -322,7 +510,13 @@ class JarvisFloatingService : Service() {
         }
 
         bubble = null
-        bubbleParams = null
+
+        try {
+            tts?.stop()
+            tts?.shutdown()
+        } catch (_: Exception) {}
+
+        tts = null
 
         super.onDestroy()
     }
