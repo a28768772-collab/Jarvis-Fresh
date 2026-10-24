@@ -16,13 +16,18 @@
     <uses-permission
         android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- JARVIS 3.4 CONTACT CALLING -->
+    <!-- JARVIS CONTACT CALLING -->
 
     <uses-permission
         android:name="android.permission.READ_CONTACTS" />
 
     <uses-permission
         android:name="android.permission.CALL_PHONE" />
+
+    <!-- FLOATING EMOJI BUBBLE PERMISSION -->
+
+    <uses-permission
+        android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- AVAILABLE APPS AND VOICE SERVICES -->
 
@@ -91,6 +96,13 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <!-- FLOATING EMOJI POPUP -->
+
+        <service
+            android:name=".JarvisFloatingService"
+            android:enabled="true"
+            android:exported="false" />
 
     </application>
 
