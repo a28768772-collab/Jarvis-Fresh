@@ -1,6 +1,8 @@
+
 package com.example.jarvis
 
 import android.accessibilityservice.AccessibilityService
+import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -24,7 +26,62 @@ class JarvisCommandManager(
 
         val service = JarvisAccessibility.active
 
+        // =========================
+        // CONTACT CALL CONFIRMATION
+        // =========================
+
+        if (JarvisContactCalling.isConfirmation(text)) {
+            return JarvisContactCalling.confirm(context, text)
+        }
+
+        // =========================
+        // CONTACT CALLING
+        // =========================
+
+        val callSuffixes = listOf(
+            " को कॉल लगाओ",
+            " को कॉल करो",
+            " को फोन लगाओ",
+            " को फोन करो",
+            " को call करो",
+            " को call लगाओ",
+            " को कॉल",
+            " को call"
+        )
+
+        val matchedSuffix = callSuffixes.firstOrNull {
+            text.endsWith(it)
+        }
+
+        if (matchedSuffix != null) {
+
+            val name = text
+                .removeSuffix(matchedSuffix)
+                .removePrefix("कृपया ")
+                .removePrefix("please ")
+                .trim()
+
+            return JarvisContactCalling.findContact(
+                context,
+                name
+            )
+        }
+
+        if (text.startsWith("call ")) {
+
+            val name = text
+                .removePrefix("call ")
+                .trim()
+
+            return JarvisContactCalling.findContact(
+                context,
+                name
+            )
+        }
+
+        // =========================
         // MOBILE GLOBAL ACTIONS
+        // =========================
 
         fun global(action: Int): String {
 
@@ -39,7 +96,9 @@ class JarvisCommandManager(
             }
         }
 
+        // =========================
         // OPEN ANDROID INTENT
+        // =========================
 
         fun launch(
             intent: Intent,
@@ -54,11 +113,14 @@ class JarvisCommandManager(
                 response
 
             } catch (e: Exception) {
+
                 "यह काम अभी नहीं हो सका"
             }
         }
 
+        // =========================
         // OPEN WEBSITE
+        // =========================
 
         fun openUrl(url: String): String {
 
@@ -71,7 +133,9 @@ class JarvisCommandManager(
             )
         }
 
+        // =========================
         // OPEN APP
+        // =========================
 
         fun openApp(
             packageName: String,
@@ -94,7 +158,9 @@ class JarvisCommandManager(
             }
         }
 
+        // =========================
         // GOOGLE SEARCH
+        // =========================
 
         fun search(query: String): String {
 
@@ -108,9 +174,67 @@ class JarvisCommandManager(
             )
         }
 
+        // =========================
         // COMMAND PROCESSING
+        // =========================
 
         return when {
+
+            // =========================
+            // JARVIS 3.5 UNLOCK ASSISTANCE
+            // CHECK BEFORE LOCK COMMAND
+            // =========================
+
+            text.contains("फोन अनलॉक") ||
+            text.contains("मोबाइल अनलॉक") ||
+            text.contains("स्क्रीन अनलॉक") ||
+            text.contains("unlock phone") ||
+            text.contains("unlock screen") -> {
+
+                try {
+
+                    val keyguardManager =
+                        context.getSystemService(
+                            Context.KEYGUARD_SERVICE
+                        ) as KeyguardManager
+
+                    if (keyguardManager.isDeviceLocked) {
+
+                        "फोन अनलॉक करने के लिए फिंगरप्रिंट, फेस या पिन इस्तेमाल करें"
+
+                    } else {
+
+                        "सर, फोन पहले से अनलॉक है"
+                    }
+
+                } catch (e: Exception) {
+
+                    "फोन की लॉक स्थिति नहीं जाँची जा सकी"
+                }
+            }
+
+            // =========================
+            // JARVIS 3.5 PHONE LOCK
+            // =========================
+
+            text.contains("फोन लॉक") ||
+            text.contains("मोबाइल लॉक") ||
+            text.contains("स्क्रीन लॉक") ||
+            text.contains("lock phone") ||
+            text.contains("lock screen") -> {
+
+                when {
+
+                    service == null ->
+                        "पहले Jarvis Accessibility चालू करें"
+
+                    service.lockPhone() ->
+                        "जी सर, फोन लॉक कर रहा हूँ"
+
+                    else ->
+                        "फोन लॉक नहीं हो सका"
+                }
+            }
 
             // SCROLL DOWN
 
@@ -118,6 +242,7 @@ class JarvisCommandManager(
             text.contains("scroll down") -> {
 
                 when {
+
                     service == null ->
                         "पहले Jarvis Accessibility चालू करें"
 
@@ -135,6 +260,7 @@ class JarvisCommandManager(
             text.contains("scroll up") -> {
 
                 when {
+
                     service == null ->
                         "पहले Jarvis Accessibility चालू करें"
 
@@ -155,6 +281,7 @@ class JarvisCommandManager(
                 val label = text.substringAfter(' ').trim()
 
                 when {
+
                     service == null ->
                         "पहले Jarvis Accessibility चालू करें"
 
@@ -301,7 +428,9 @@ class JarvisCommandManager(
             text.contains("camera") ->
 
                 launch(
-                    Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA),
+                    Intent(
+                        MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA
+                    ),
                     "कैमरा खोल रहा हूँ"
                 )
 
@@ -344,7 +473,9 @@ class JarvisCommandManager(
                 val calculator = Intent(
                     Intent.ACTION_MAIN
                 ).apply {
-                    addCategory(Intent.CATEGORY_APP_CALCULATOR)
+                    addCategory(
+                        Intent.CATEGORY_APP_CALCULATOR
+                    )
                 }
 
                 launch(
@@ -392,7 +523,9 @@ class JarvisCommandManager(
             text.contains("battery") ->
 
                 launch(
-                    Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS),
+                    Intent(
+                        Settings.ACTION_BATTERY_SAVER_SETTINGS
+                    ),
                     "बैटरी सेटिंग खोल रहा हूँ"
                 )
 
