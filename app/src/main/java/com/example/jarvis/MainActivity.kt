@@ -1,4 +1,3 @@
-
 package com.example.jarvis
 
 import android.Manifest
@@ -7,6 +6,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.speech.RecognizerIntent
@@ -20,8 +20,10 @@ class MainActivity : Activity(),
 
     private lateinit var status: TextView
     private lateinit var command: EditText
+
     private var tts: TextToSpeech? = null
     private val speechRequest = 42
+    private val audioRequest = 101
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,7 +40,7 @@ class MainActivity : Activity(),
         scrollView.addView(layout)
 
         layout.addView(TextView(this).apply {
-            text = "JARVIS ULTIMATE 3.0"
+            text = "JARVIS ULTIMATE 3.1"
             textSize = 27f
             gravity = Gravity.CENTER
         })
@@ -48,15 +50,20 @@ class MainActivity : Activity(),
             textSize = 18f
             setPadding(0, 25, 0, 25)
         }
+
         layout.addView(status)
 
         command = EditText(this).apply {
             hint = "Jarvis को कमांड दें"
             setSingleLine(true)
         }
+
         layout.addView(command)
 
-        fun addButton(title: String, action: () -> Unit) {
+        fun addButton(
+            title: String,
+            action: () -> Unit
+        ) {
             layout.addView(Button(this).apply {
                 text = title
                 setOnClickListener { action() }
@@ -71,28 +78,58 @@ class MainActivity : Activity(),
             listen()
         }
 
+        // HEY JARVIS BACKGROUND VOICE
+
+        addButton("START HEY JARVIS") {
+            startJarvisVoice()
+        }
+
+        addButton("STOP LISTENING") {
+            stopService(
+                Intent(
+                    this,
+                    JarvisVoiceService::class.java
+                )
+            )
+            say("Jarvis Listening बंद कर दी गई है")
+        }
+
+        // MOBILE CONTROL
+
         addButton("ENABLE MOBILE CONTROL") {
-            openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            openSettings(
+                Settings.ACTION_ACCESSIBILITY_SETTINGS
+            )
         }
 
         addButton("HOME") {
-            global(AccessibilityService.GLOBAL_ACTION_HOME)
+            global(
+                AccessibilityService.GLOBAL_ACTION_HOME
+            )
         }
 
         addButton("BACK") {
-            global(AccessibilityService.GLOBAL_ACTION_BACK)
+            global(
+                AccessibilityService.GLOBAL_ACTION_BACK
+            )
         }
 
         addButton("RECENT APPS") {
-            global(AccessibilityService.GLOBAL_ACTION_RECENTS)
+            global(
+                AccessibilityService.GLOBAL_ACTION_RECENTS
+            )
         }
 
         addButton("NOTIFICATIONS") {
-            global(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
+            global(
+                AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
+            )
         }
 
         addButton("QUICK SETTINGS") {
-            global(AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS)
+            global(
+                AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS
+            )
         }
 
         addButton("WIFI SETTINGS") {
@@ -105,11 +142,49 @@ class MainActivity : Activity(),
 
         setContentView(scrollView)
 
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED) {
+        if (
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
             requestPermissions(
-                arrayOf(Manifest.permission.RECORD_AUDIO), 1
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                audioRequest
             )
+        }
+    }
+
+    // START BACKGROUND SERVICE
+
+    private fun startJarvisVoice() {
+
+        if (
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                audioRequest
+            )
+            say("पहले माइक्रोफोन की अनुमति दें")
+            return
+        }
+
+        try {
+            val intent = Intent(
+                this,
+                JarvisVoiceService::class.java
+            )
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+
+            say("Jarvis Voice Service शुरू हो रही है")
+
+        } catch (e: Exception) {
+            say("Voice Service शुरू नहीं हो सकी")
         }
     }
 
@@ -121,6 +196,7 @@ class MainActivity : Activity(),
 
     private fun say(message: String) {
         status.text = message
+
         tts?.speak(
             message,
             TextToSpeech.QUEUE_FLUSH,
@@ -130,10 +206,14 @@ class MainActivity : Activity(),
     }
 
     private fun listen() {
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED) {
+
+        if (
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
             requestPermissions(
-                arrayOf(Manifest.permission.RECORD_AUDIO), 1
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                audioRequest
             )
             return
         }
@@ -146,10 +226,18 @@ class MainActivity : Activity(),
                     RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                     RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
                 )
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
+
+                putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE,
+                    "hi-IN"
+                )
             }
 
-            startActivityForResult(intent, speechRequest)
+            startActivityForResult(
+                intent,
+                speechRequest
+            )
+
         } catch (e: Exception) {
             say("Voice Recognition उपलब्ध नहीं है")
         }
@@ -161,11 +249,20 @@ class MainActivity : Activity(),
         resultCode: Int,
         data: Intent?
     ) {
-        super.onActivityResult(requestCode, resultCode, data)
+        super.onActivityResult(
+            requestCode,
+            resultCode,
+            data
+        )
 
-        if (requestCode == speechRequest && resultCode == RESULT_OK) {
+        if (
+            requestCode == speechRequest &&
+            resultCode == RESULT_OK
+        ) {
             val spoken = data
-                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.getStringArrayListExtra(
+                    RecognizerIntent.EXTRA_RESULTS
+                )
                 ?.firstOrNull() ?: return
 
             command.setText(spoken)
@@ -174,10 +271,11 @@ class MainActivity : Activity(),
     }
 
     private fun global(action: Int) {
+
         val service = JarvisAccessibility.active
 
         if (service == null) {
-            say("पहले Jarvis Accessibility चालू करें")
+            permission()
             return
         }
 
@@ -200,7 +298,10 @@ class MainActivity : Activity(),
     private fun openUrl(url: String) {
         try {
             startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse(url)
+                )
             )
             say("जी सर, खोल रहा हूँ")
         } catch (e: Exception) {
@@ -208,8 +309,13 @@ class MainActivity : Activity(),
         }
     }
 
-    private fun openApp(pkg: String, fallback: String) {
-        val intent = packageManager.getLaunchIntentForPackage(pkg)
+    private fun openApp(
+        pkg: String,
+        fallback: String
+    ) {
+
+        val intent =
+            packageManager.getLaunchIntentForPackage(pkg)
 
         try {
             if (intent != null) {
@@ -224,6 +330,7 @@ class MainActivity : Activity(),
     }
 
     private fun runCommand(raw: String) {
+
         val text = raw.trim().lowercase(Locale.ROOT)
 
         if (text.isBlank()) {
@@ -234,6 +341,7 @@ class MainActivity : Activity(),
         val service = JarvisAccessibility.active
 
         when {
+
             text.contains("यूट्यूब") ||
             text.contains("youtube") ->
                 openApp(
@@ -258,64 +366,91 @@ class MainActivity : Activity(),
             text.contains("वाईफाई") ||
             text.contains("wifi") ||
             text.contains("wi-fi") ->
-                openSettings(Settings.ACTION_WIFI_SETTINGS)
+                openSettings(
+                    Settings.ACTION_WIFI_SETTINGS
+                )
 
             text.contains("ब्लूटूथ") ||
             text.contains("bluetooth") ->
-                openSettings(Settings.ACTION_BLUETOOTH_SETTINGS)
+                openSettings(
+                    Settings.ACTION_BLUETOOTH_SETTINGS
+                )
 
             text.contains("सेटिंग") ||
             text.contains("settings") ->
-                openSettings(Settings.ACTION_SETTINGS)
+                openSettings(
+                    Settings.ACTION_SETTINGS
+                )
 
             text.contains("नोटिफिकेशन") ||
             text.contains("notification") ->
-                global(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
+                global(
+                    AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
+                )
 
             text.contains("क्विक सेटिंग") ||
             text.contains("quick settings") ->
-                global(AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS)
+                global(
+                    AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS
+                )
 
             text.contains("रीसेंट") ||
             text.contains("recent") ->
-                global(AccessibilityService.GLOBAL_ACTION_RECENTS)
+                global(
+                    AccessibilityService.GLOBAL_ACTION_RECENTS
+                )
 
             text.contains("होम") ||
             text == "home" ->
-                global(AccessibilityService.GLOBAL_ACTION_HOME)
+                global(
+                    AccessibilityService.GLOBAL_ACTION_HOME
+                )
 
             text.contains("बैक") ||
             text.contains("पीछे") ||
             text == "back" ->
-                global(AccessibilityService.GLOBAL_ACTION_BACK)
+                global(
+                    AccessibilityService.GLOBAL_ACTION_BACK
+                )
 
             text.contains("नीचे स्क्रॉल") ||
             text.contains("scroll down") -> {
+
                 if (service == null) {
                     permission()
                 } else {
-                    service.scroll(false)
-                    say("नीचे स्क्रॉल किया")
+                    if (service.scroll(false)) {
+                        say("नीचे स्क्रॉल किया")
+                    } else {
+                        say("स्क्रॉल नहीं हो सका")
+                    }
                 }
             }
 
             text.contains("ऊपर स्क्रॉल") ||
             text.contains("scroll up") -> {
+
                 if (service == null) {
                     permission()
                 } else {
-                    service.scroll(true)
-                    say("ऊपर स्क्रॉल किया")
+                    if (service.scroll(true)) {
+                        say("ऊपर स्क्रॉल किया")
+                    } else {
+                        say("स्क्रॉल नहीं हो सका")
+                    }
                 }
             }
 
             text.startsWith("क्लिक ") ||
             text.startsWith("टच ") ||
             text.startsWith("click ") -> {
+
                 if (service == null) {
                     permission()
                 } else {
-                    val label = text.substringAfter(' ').trim()
+                    val label =
+                        text.substringAfter(' ').trim()
+
                     if (service.tapLabel(label)) {
                         say("क्लिक करने की कोशिश की")
                     } else {
@@ -326,7 +461,10 @@ class MainActivity : Activity(),
 
             text.startsWith("सर्च ") ||
             text.startsWith("search ") -> {
-                val query = text.substringAfter(' ').trim()
+
+                val query =
+                    text.substringAfter(' ').trim()
+
                 if (query.isNotBlank()) {
                     openUrl(
                         "https://www.google.com/search?q=" +
@@ -337,17 +475,26 @@ class MainActivity : Activity(),
 
             text.startsWith("वेबसाइट ") ||
             text.startsWith("website ") -> {
-                val site = text.substringAfter(' ').trim()
-                if (site.matches(
-                    Regex("[a-z0-9.-]+\\.[a-z]{2,}(/[^ ]*)?")
-                )) {
+
+                val site =
+                    text.substringAfter(' ').trim()
+
+                if (
+                    site.matches(
+                        Regex(
+                            "[a-z0-9.-]+\\.[a-z]{2,}(/[^ ]*)?"
+                        )
+                    )
+                ) {
                     openUrl("https://$site")
                 } else {
                     say("सही वेबसाइट का नाम बताइए")
                 }
             }
 
-            else -> say("यह कमांड अभी उपलब्ध नहीं है")
+            else -> {
+                say("यह कमांड अभी उपलब्ध नहीं है")
+            }
         }
     }
 
