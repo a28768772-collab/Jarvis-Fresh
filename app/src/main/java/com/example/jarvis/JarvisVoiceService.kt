@@ -4,10 +4,11 @@ import android.Manifest
 import android.app.*
 import android.content.*
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.os.*
 import android.speech.*
 import android.speech.tts.TextToSpeech
-import android.accessibilityservice.AccessibilityService
+import android.speech.tts.UtteranceProgressListener
 import java.util.Locale
 
 class JarvisVoiceService : Service(),
@@ -21,19 +22,30 @@ class JarvisVoiceService : Service(),
     }
 
     private val handler = Handler(Looper.getMainLooper())
+
     private var recognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
+
     private var ready = false
     private var running = false
+    private var listening = false
+    private var speaking = false
     private var waitingForCommand = false
+
+    private var nextListen: Runnable? = null
+
+    private val manager by lazy {
+        JarvisCommandManager(this)
+    }
 
     override fun onCreate() {
         super.onCreate()
+
         tts = TextToSpeech(this, this)
 
         val channel = NotificationChannel(
             CHANNEL,
-            "Jarvis Voice",
+            "Jarvis Voice Control",
             NotificationManager.IMPORTANCE_LOW
         )
 
@@ -54,48 +66,69 @@ class JarvisVoiceService : Service(),
 
         if (running) return START_NOT_STICKY
 
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED) {
+        if (
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
             stopSelf()
             return START_NOT_STICKY
         }
 
-        val openIntent = Intent(this, MainActivity::class.java)
+        val openIntent = Intent(
+            this,
+            MainActivity::class.java
+        )
 
         val pending = PendingIntent.getActivity(
-            this, 0, openIntent,
+            this,
+            0,
+            openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or
                 PendingIntent.FLAG_IMMUTABLE
         )
 
-        val stopIntent = Intent(this, JarvisVoiceService::class.java)
-            .setAction(STOP)
+        val stopIntent = Intent(
+            this,
+            JarvisVoiceService::class.java
+        ).setAction(STOP)
 
         val stopPending = PendingIntent.getService(
-            this, 1, stopIntent,
+            this,
+            1,
+            stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or
                 PendingIntent.FLAG_IMMUTABLE
         )
 
         val notification = Notification.Builder(this, CHANNEL)
-            .setContentTitle("JARVIS 3.1")
+            .setContentTitle("JARVIS ULTIMATE 3.2")
             .setContentText("Hey Jarvis listening active")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentIntent(pending)
             .addAction(
                 Notification.Action.Builder(
-                    null, "STOP", stopPending
+                    null,
+                    "STOP",
+                    stopPending
                 ).build()
             )
             .setOngoing(true)
             .build()
 
-        startForeground(
-            NOTIFICATION_ID,
-            notification,
-            android.content.pm.ServiceInfo
-                .FOREGROUND_SERVICE_TYPE_MICROPHONE
-        )
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
 
         running = true
         waitingForCommand = false
@@ -103,7 +136,7 @@ class JarvisVoiceService : Service(),
         if (SpeechRecognizer.isRecognitionAvailable(this)) {
             recognizer = SpeechRecognizer.createSpeechRecognizer(this)
             recognizer?.setRecognitionListener(this)
-            listenAgain()
+            listenAgain(700)
         } else {
             speak("वॉइस रिकग्निशन उपलब्ध नहीं है")
         }
@@ -112,41 +145,65 @@ class JarvisVoiceService : Service(),
     }
 
     private fun listenAgain(delay: Long = 500) {
-        if (!running) return
 
-        handler.postDelayed({
-            if (!running) return@postDelayed
+        if (!running || speaking || listening) return
+
+        nextListen?.let { handler.removeCallbacks(it) }
+
+        val task = Runnable {
+            if (!running || speaking || listening) return@Runnable
 
             try {
+                listening = true
+
                 recognizer?.startListening(
-                    Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    Intent(
+                        RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+                    ).apply {
                         putExtra(
                             RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                             RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
                         )
+
                         putExtra(
                             RecognizerIntent.EXTRA_LANGUAGE,
                             "hi-IN"
                         )
+
                         putExtra(
                             RecognizerIntent.EXTRA_PARTIAL_RESULTS,
                             false
                         )
                     }
                 )
-            } catch (_: Exception) {
+
+            } catch (e: Exception) {
+                listening = false
                 listenAgain(2000)
             }
-        }, delay)
+        }
+
+        nextListen = task
+        handler.postDelayed(task, delay)
     }
 
     override fun onResults(results: Bundle?) {
+
+        listening = false
+
         val heard = results
-            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            ?.getStringArrayList(
+                SpeechRecognizer.RESULTS_RECOGNITION
+            )
             ?.firstOrNull()
             ?.lowercase(Locale.ROOT)
             ?.trim()
             .orEmpty()
+
+        if (heard.isBlank()) {
+            listenAgain()
+            return
+        }
 
         if (waitingForCommand) {
             waitingForCommand = false
@@ -159,7 +216,8 @@ class JarvisVoiceService : Service(),
             "हे जार्विस",
             "हे जारविस",
             "हाय जार्विस",
-            "जार्विस"
+            "जार्विस",
+            "jarvis"
         )
 
         val wake = wakeWords.firstOrNull {
@@ -167,6 +225,7 @@ class JarvisVoiceService : Service(),
         }
 
         if (wake != null) {
+
             val remaining = heard.substringAfter(wake).trim()
 
             if (remaining.isNotEmpty()) {
@@ -175,95 +234,87 @@ class JarvisVoiceService : Service(),
                 waitingForCommand = true
                 speak("जी सर, बताइए")
             }
+
         } else {
             listenAgain()
         }
     }
 
+    // ALL COMMANDS THROUGH COMMAND MANAGER
+
     private fun executeCommand(command: String) {
-        val service = JarvisAccessibility.active
 
-        val action = when {
-            command.contains("होम") || command == "home" ->
-                AccessibilityService.GLOBAL_ACTION_HOME
-
-            command.contains("बैक") ||
-            command.contains("पीछे") ->
-                AccessibilityService.GLOBAL_ACTION_BACK
-
-            command.contains("रीसेंट") ||
-            command.contains("recent") ->
-                AccessibilityService.GLOBAL_ACTION_RECENTS
-
-            command.contains("नोटिफिकेशन") ->
-                AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
-
-            command.contains("क्विक सेटिंग") ->
-                AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS
-
-            else -> null
-        }
-
-        if (action != null) {
-            if (service?.performGlobalAction(action) == true) {
-                speak("जी सर")
-            } else {
-                speak("पहले मोबाइल कंट्रोल चालू करें")
-            }
+        if (command.isBlank()) {
+            speak("कृपया कमांड बताइए")
             return
         }
 
-        if (command.contains("नीचे स्क्रॉल")) {
-            speak(
-                if (service?.scroll(false) == true)
-                    "जी सर" else "स्क्रॉल नहीं हो सका"
-            )
-            return
+        try {
+            val result = manager.execute(command)
+            speak(result)
+        } catch (e: Exception) {
+            speak("कमांड चलाने में समस्या आई")
         }
-
-        if (command.contains("ऊपर स्क्रॉल")) {
-            speak(
-                if (service?.scroll(true) == true)
-                    "जी सर" else "स्क्रॉल नहीं हो सका"
-            )
-            return
-        }
-
-        speak("यह कमांड अभी उपलब्ध नहीं है")
     }
 
     private fun speak(message: String) {
-        try {
-            recognizer?.cancel()
-        } catch (_: Exception) {}
+
+        speaking = true
+
+        nextListen?.let { handler.removeCallbacks(it) }
+        nextListen = null
+
+        if (listening) {
+            try {
+                recognizer?.cancel()
+            } catch (_: Exception) {}
+            listening = false
+        }
 
         if (ready) {
-            tts?.speak(
+
+            val result = tts?.speak(
                 message,
                 TextToSpeech.QUEUE_FLUSH,
                 null,
                 "jarvis_voice"
             )
+
+            if (result != TextToSpeech.SUCCESS) {
+                speaking = false
+                listenAgain(1200)
+            }
+
         } else {
+            speaking = false
             listenAgain(1500)
         }
     }
 
     override fun onInit(status: Int) {
+
         if (status == TextToSpeech.SUCCESS) {
+
             tts?.language = Locale("hi", "IN")
             ready = true
 
             tts?.setOnUtteranceProgressListener(
-                object : android.speech.tts.UtteranceProgressListener() {
+                object : UtteranceProgressListener() {
+
                     override fun onStart(id: String?) {}
 
                     override fun onDone(id: String?) {
-                        handler.post { listenAgain(400) }
+                        handler.post {
+                            speaking = false
+                            listenAgain(500)
+                        }
                     }
 
                     override fun onError(id: String?) {
-                        handler.post { listenAgain(1000) }
+                        handler.post {
+                            speaking = false
+                            listenAgain(1200)
+                        }
                     }
                 }
             )
@@ -271,38 +322,59 @@ class JarvisVoiceService : Service(),
     }
 
     override fun onError(error: Int) {
-        if (!running) return
+
+        listening = false
+
+        if (!running || speaking) return
 
         val delay = when (error) {
+
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
-            SpeechRecognizer.ERROR_CLIENT -> 2000L
+            SpeechRecognizer.ERROR_CLIENT -> 2500L
+
             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
                 stopSelf()
                 return
             }
-            else -> 1000L
+
+            else -> 1200L
         }
 
         listenAgain(delay)
     }
 
     override fun onReadyForSpeech(params: Bundle?) {}
+
     override fun onBeginningOfSpeech() {}
+
     override fun onRmsChanged(rmsdB: Float) {}
+
     override fun onBufferReceived(buffer: ByteArray?) {}
+
     override fun onEndOfSpeech() {}
+
     override fun onPartialResults(partialResults: Bundle?) {}
+
     override fun onEvent(eventType: Int, params: Bundle?) {}
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+
         running = false
+        listening = false
+        speaking = false
+
         handler.removeCallbacksAndMessages(null)
-        recognizer?.cancel()
-        recognizer?.destroy()
+
+        try {
+            recognizer?.cancel()
+            recognizer?.destroy()
+        } catch (_: Exception) {}
+
         tts?.stop()
         tts?.shutdown()
+
         super.onDestroy()
     }
 }
