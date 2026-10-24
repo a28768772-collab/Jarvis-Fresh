@@ -1,0 +1,7 @@
+<resources>
+
+    <string name="app_name">JARVIS Ultimate</string>
+
+    <string name="accessibility_description">Jarvis can perform screen taps, scrolling and navigation when the user enables Accessibility Service.</string>
+
+</resources>
