@@ -47,7 +47,7 @@ class MainActivity : Activity(),
         scrollView.addView(layout)
 
         layout.addView(TextView(this).apply {
-            text = "JARVIS ULTIMATE 3.6"
+            text = "JARVIS ULTIMATE 3.7"
             textSize = 27f
             gravity = Gravity.CENTER
         })
@@ -133,9 +133,9 @@ class MainActivity : Activity(),
             say("Jarvis Listening बंद कर दी गई है")
         }
 
-        // CONTACT PERMISSIONS
+        // CONTACT + INCOMING CALL PERMISSIONS
 
-        addButton("📞 ENABLE CONTACT CALLING") {
+        addButton("📞 ENABLE PHONE CONTROL") {
             checkContactPermissions()
         }
 
@@ -226,9 +226,19 @@ class MainActivity : Activity(),
             missing.add(Manifest.permission.CALL_PHONE)
         }
 
+        // Incoming Call Answer / Reject permission.
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            checkSelfPermission(
+                Manifest.permission.ANSWER_PHONE_CALLS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            missing.add(Manifest.permission.ANSWER_PHONE_CALLS)
+        }
+
         if (missing.isEmpty()) {
 
-            say("Contacts और Phone Call की अनुमति पहले से चालू है")
+            say("Jarvis Phone Control की सभी जरूरी अनुमतियाँ पहले से चालू हैं")
             return true
         }
 
@@ -265,18 +275,34 @@ class MainActivity : Activity(),
                         Manifest.permission.CALL_PHONE
                     ) == PackageManager.PERMISSION_GRANTED
 
+                val answerAllowed =
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+                    checkSelfPermission(
+                        Manifest.permission.ANSWER_PHONE_CALLS
+                    ) == PackageManager.PERMISSION_GRANTED
+
                 when {
 
-                    contactsAllowed && phoneAllowed -> {
-                        say("Jarvis Contact Calling तैयार है")
+                    contactsAllowed &&
+                    phoneAllowed &&
+                    answerAllowed -> {
+
+                        say("Jarvis Phone Control तैयार है। Contact Calling और Incoming Call Permission चालू हैं")
                     }
 
-                    contactsAllowed -> {
-                        say("Contacts की अनुमति मिल गई है। कॉल लगाने के लिए Phone Permission भी दें")
+                    !contactsAllowed -> {
+
+                        say("Contact खोजने के लिए Contacts Permission दें")
                     }
 
-                    else -> {
-                        say("Contact खोजने के लिए Contacts Permission जरूरी है")
+                    !phoneAllowed -> {
+
+                        say("सीधे कॉल लगाने के लिए Phone Permission दें")
+                    }
+
+                    !answerAllowed -> {
+
+                        say("Incoming Call उठाने के लिए Answer Phone Calls Permission दें")
                     }
                 }
             }
@@ -544,9 +570,7 @@ class MainActivity : Activity(),
 
         if (service.performGlobalAction(action)) {
 
-            say("जी सर, कमांड पूरी हुई"
-
-            )
+            say("जी सर, कमांड पूरी हुई")
 
         } else {
 
