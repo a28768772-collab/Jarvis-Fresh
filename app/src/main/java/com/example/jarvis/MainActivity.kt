@@ -5,6 +5,7 @@ import android.app.Activity
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -24,6 +25,7 @@ class MainActivity : Activity(),
 
     private val speechRequest = 42
     private val audioRequest = 101
+    private val overlayRequest = 202
 
     private val manager by lazy {
         JarvisCommandManager(this)
@@ -44,13 +46,13 @@ class MainActivity : Activity(),
         scrollView.addView(layout)
 
         layout.addView(TextView(this).apply {
-            text = "JARVIS ULTIMATE 3.2"
+            text = "JARVIS ULTIMATE 3.5"
             textSize = 27f
             gravity = Gravity.CENTER
         })
 
         status = TextView(this).apply {
-            text = "Jarvis Ready"
+            text = "Jarvis Ready 😎"
             textSize = 18f
             setPadding(0, 25, 0, 25)
         }
@@ -70,8 +72,26 @@ class MainActivity : Activity(),
         ) {
             layout.addView(Button(this).apply {
                 text = title
+                isAllCaps = false
                 setOnClickListener { action() }
             })
+        }
+
+        // FLOATING EMOJI JARVIS
+
+        addButton("😎 SHOW FLOATING JARVIS") {
+            startFloatingJarvis()
+        }
+
+        addButton("❌ HIDE FLOATING JARVIS") {
+            stopService(
+                Intent(
+                    this,
+                    JarvisFloatingService::class.java
+                )
+            )
+
+            status.text = "Floating Jarvis बंद कर दिया गया"
         }
 
         // VOICE CONTROL
@@ -95,6 +115,7 @@ class MainActivity : Activity(),
                     JarvisVoiceService::class.java
                 )
             )
+
             say("Jarvis Listening बंद कर दी गई है")
         }
 
@@ -163,6 +184,49 @@ class MainActivity : Activity(),
         checkAudioPermission()
     }
 
+    // FLOATING BUBBLE PERMISSION
+
+    private fun startFloatingJarvis() {
+
+        if (!Settings.canDrawOverlays(this)) {
+
+            status.text =
+                "पहले Display over other apps अनुमति चालू करें"
+
+            try {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+
+                startActivityForResult(
+                    intent,
+                    overlayRequest
+                )
+
+            } catch (e: Exception) {
+                say("Floating Window की सेटिंग नहीं खुल सकी")
+            }
+
+            return
+        }
+
+        try {
+            startService(
+                Intent(
+                    this,
+                    JarvisFloatingService::class.java
+                )
+            )
+
+            status.text =
+                "Floating Jarvis शुरू हो गया 😎"
+
+        } catch (e: Exception) {
+            say("Floating Jarvis शुरू नहीं हो सका")
+        }
+    }
+
     private fun checkAudioPermission(): Boolean {
 
         if (
@@ -201,7 +265,8 @@ class MainActivity : Activity(),
                 startService(intent)
             }
 
-            status.text = "Jarvis Voice Service शुरू हो रही है"
+            status.text =
+                "Jarvis Voice Service शुरू हो रही है"
 
         } catch (e: Exception) {
             say("Voice Service शुरू नहीं हो सकी")
@@ -273,6 +338,18 @@ class MainActivity : Activity(),
             resultCode,
             data
         )
+
+        if (requestCode == overlayRequest) {
+
+            if (Settings.canDrawOverlays(this)) {
+                startFloatingJarvis()
+            } else {
+                status.text =
+                    "Floating Jarvis के लिए अनुमति जरूरी है"
+            }
+
+            return
+        }
 
         if (
             requestCode == speechRequest &&
