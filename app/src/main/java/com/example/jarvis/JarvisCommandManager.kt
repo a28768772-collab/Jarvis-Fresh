@@ -17,13 +17,60 @@ class JarvisCommandManager(
 
     fun execute(raw: String): String {
 
-        val text = raw.trim().lowercase(Locale.ROOT)
+        val text = raw.trim()
+            .lowercase(Locale.ROOT)
+            .replace(Regex("[,.!?।]+"), "")
+            .replace(Regex("\\s+"), " ")
 
         if (text.isBlank()) {
             return "कृपया कमांड बोलिए"
         }
 
         val service = JarvisAccessibility.active
+
+        // =========================
+        // INCOMING CALL CONTROL
+        // Must run BEFORE contact calling.
+        // =========================
+
+        val answerCommands = setOf(
+            "कॉल उठाओ",
+            "कॉल उठा लो",
+            "कॉल उठा दो",
+            "फोन उठाओ",
+            "फोन उठा लो",
+            "फोन उठा दो",
+            "कॉल रिसीव करो",
+            "फोन रिसीव करो",
+            "इनकमिंग कॉल उठाओ",
+            "answer call",
+            "answer the call",
+            "pick up call",
+            "pick up the call",
+            "receive call"
+        )
+
+        val rejectCommands = setOf(
+            "कॉल काट दो",
+            "कॉल काटो",
+            "फोन काट दो",
+            "फोन काटो",
+            "कॉल रिजेक्ट करो",
+            "कॉल मत उठाओ",
+            "कॉल मत उठाना",
+            "reject call",
+            "decline call",
+            "end call",
+            "hang up"
+        )
+
+        if (text in answerCommands) {
+            return JarvisIncomingCall.answer(context)
+        }
+
+        if (text in rejectCommands) {
+            return JarvisIncomingCall.reject(context)
+        }
 
         // =========================
         // CONTACT CALL CONFIRMATION
@@ -111,7 +158,7 @@ class JarvisCommandManager(
 
                 response
 
-            } catch (e: Exception) {
+            } catch (_: Exception) {
 
                 "यह काम अभी नहीं हो सका"
             }
@@ -179,10 +226,7 @@ class JarvisCommandManager(
 
         return when {
 
-            // =========================
-            // JARVIS 3.5 UNLOCK ASSISTANCE
-            // CHECK BEFORE LOCK COMMAND
-            // =========================
+            // UNLOCK ASSISTANCE
 
             text.contains("फोन अनलॉक") ||
             text.contains("मोबाइल अनलॉक") ||
@@ -206,15 +250,13 @@ class JarvisCommandManager(
                         "सर, फोन पहले से अनलॉक है"
                     }
 
-                } catch (e: Exception) {
+                } catch (_: Exception) {
 
                     "फोन की लॉक स्थिति नहीं जाँची जा सकी"
                 }
             }
 
-            // =========================
-            // JARVIS 3.5 PHONE LOCK
-            // =========================
+            // PHONE LOCK
 
             text.contains("फोन लॉक") ||
             text.contains("मोबाइल लॉक") ||
