@@ -137,7 +137,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         )
 
         header.addView(
-            label("AI • ONLINE", 11f, cyan, true)
+            label("AI • 3.7", 11f, cyan, true)
         )
 
         page.addView(header)
@@ -189,7 +189,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         )
 
         systemStatusCard.addView(
-            label("MODE • Online + Offline", 12f, white, false)
+            label("MODE • Assistant", 12f, white, false)
         )
 
         topCards.addView(
@@ -198,23 +198,6 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         )
 
         page.addView(topCards)
-        page.addView(space(16))
-
-        // ONLINE AI SETTINGS
-
-        page.addView(
-            label("ONLINE AI", 17f, cyan, true)
-        )
-
-        page.addView(space(8))
-
-        addActionButton(
-            page,
-            "🌐 OPEN ONLINE AI SETTINGS"
-        ) {
-            openOnlineAiSettings()
-        }
-
         page.addView(space(16))
 
         // CENTRAL HOLOGRAM CORE
@@ -303,6 +286,23 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
         messageCard.addView(status)
         page.addView(messageCard)
+
+        page.addView(space(16))
+
+        // ONLINE AI
+
+        page.addView(
+            label("ONLINE AI", 17f, cyan, true)
+        )
+
+        page.addView(space(8))
+
+        addActionButton(
+            page,
+            "🌐 OPEN ONLINE AI SETTINGS"
+        ) {
+            openOnlineAiSettings()
+        }
 
         page.addView(space(16))
 
@@ -907,4 +907,141 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
             val result = tts?.setLanguage(
                 Locale("hi", "IN")
-           
+            )
+
+            if (
+                result == TextToSpeech.LANG_MISSING_DATA ||
+                result == TextToSpeech.LANG_NOT_SUPPORTED
+            ) {
+                status.text =
+                    "Hindi Voice उपलब्ध नहीं है"
+            }
+        }
+    }
+
+    private fun say(message: String) {
+
+        status.text = message
+
+        tts?.speak(
+            message,
+            TextToSpeech.QUEUE_FLUSH,
+            null,
+            "jarvis_dashboard"
+        )
+    }
+
+    // SPEECH RECOGNITION
+
+    private fun listen() {
+
+        if (!checkAudioPermission()) return
+
+        try {
+
+            val intent = Intent(
+                RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+            ).apply {
+
+                putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                )
+
+                putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE,
+                    "hi-IN"
+                )
+
+                putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
+                    "hi-IN"
+                )
+            }
+
+            startActivityForResult(
+                intent,
+                speechRequest
+            )
+
+        } catch (_: Exception) {
+            say("Voice Recognition उपलब्ध नहीं है")
+        }
+    }
+
+    @Deprecated("Legacy activity callback")
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?
+    ) {
+
+        super.onActivityResult(
+            requestCode,
+            resultCode,
+            data
+        )
+
+        if (requestCode == overlayRequest) {
+
+            if (Settings.canDrawOverlays(this)) {
+                startFloatingJarvis()
+            } else {
+                say("Floating Jarvis के लिए अनुमति जरूरी है")
+            }
+
+            return
+        }
+
+        if (
+            requestCode == speechRequest &&
+            resultCode == RESULT_OK
+        ) {
+
+            val spoken =
+                data?.getStringArrayListExtra(
+                    RecognizerIntent.EXTRA_RESULTS
+                )?.firstOrNull() ?: return
+
+            command.setText(spoken)
+
+            runCommand(spoken)
+        }
+    }
+
+    // COMMAND MANAGER
+
+    private fun runCommand(raw: String) {
+
+        val text = raw.trim()
+
+        if (text.isBlank()) {
+            say("कृपया कमांड दें")
+            return
+        }
+
+        try {
+            say(manager.execute(text))
+        } catch (_: Exception) {
+            say("कमांड चलाने में समस्या आई")
+        }
+    }
+
+    private fun openSettings(action: String) {
+
+        try {
+            startActivity(Intent(action))
+            say("सेटिंग खोल रहा हूँ")
+        } catch (_: Exception) {
+            say("सेटिंग नहीं खुल सकी")
+        }
+    }
+
+    override fun onDestroy() {
+
+        tts?.stop()
+        tts?.shutdown()
+
+        super.onDestroy()
+    }
+}
