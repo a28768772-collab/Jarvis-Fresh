@@ -35,9 +35,13 @@ jobs:
           ls -la
           find app -type f
 
-      # NEW: Prepare Offline Voice Model Folder
       - name: Prepare Offline Voice Model Directory
- - name: Check Speaker Model Download
+        run: |
+          mkdir -p app/src/main/assets
+          echo "Voice model directory ready"
+          ls -lah app/src/main/assets
+
+      - name: Check Speaker Model Download
         run: |
           python3 - <<'PY'
           import urllib.request
@@ -50,29 +54,15 @@ jobs:
                   method="HEAD"
               )
 
-              with urllib.request.urlopen(
-                  request,
-                  timeout=30
-              ) as response:
+              with urllib.request.urlopen(request, timeout=30) as response:
                   print("HTTP Status:", response.status)
-                  print(
-                      "Model Size:",
-                      response.headers.get("Content-Length", "Unknown")
-                  )
-                  print(
-                      "Content Type:",
-                      response.headers.get("Content-Type", "Unknown")
-                  )
+                  print("Model Size:", response.headers.get("Content-Length", "Unknown"))
+                  print("Content Type:", response.headers.get("Content-Type", "Unknown"))
 
           except Exception as error:
               print("Model link verification failed:", error)
               raise SystemExit(1)
           PY
-
-        run: |
-          mkdir -p app/src/main/assets
-          echo "Voice model directory ready"
-          ls -lah app/src/main/assets
 
       - name: Install Android SDK
         run: |
