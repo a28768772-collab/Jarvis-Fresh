@@ -2,8 +2,11 @@
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- JARVIS VOICE PERMISSIONS -->
+    <!-- JARVIS INTERNET / ONLINE AI -->
+    <uses-permission
+        android:name="android.permission.INTERNET" />
 
+    <!-- JARVIS VOICE PERMISSIONS -->
     <uses-permission
         android:name="android.permission.RECORD_AUDIO" />
 
@@ -17,7 +20,6 @@
         android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- JARVIS CONTACT AND PHONE CALLING -->
-
     <uses-permission
         android:name="android.permission.READ_CONTACTS" />
 
@@ -25,17 +27,14 @@
         android:name="android.permission.CALL_PHONE" />
 
     <!-- INCOMING CALL ANSWER / REJECT -->
-
     <uses-permission
         android:name="android.permission.ANSWER_PHONE_CALLS" />
 
     <!-- FLOATING EMOJI BUBBLE PERMISSION -->
-
     <uses-permission
         android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- AVAILABLE APPS AND VOICE SERVICES -->
-
     <queries>
 
         <intent>
@@ -60,7 +59,6 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <!-- MAIN ACTIVITY -->
-
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -75,8 +73,12 @@
 
         </activity>
 
-        <!-- MOBILE ACCESSIBILITY CONTROL -->
+        <!-- ONLINE AI SETTINGS -->
+        <activity
+            android:name=".OnlineAiSettingsActivity"
+            android:exported="false" />
 
+        <!-- MOBILE ACCESSIBILITY CONTROL -->
         <service
             android:name=".JarvisAccessibility"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
@@ -95,7 +97,6 @@
         </service>
 
         <!-- HEY JARVIS BACKGROUND VOICE -->
-
         <service
             android:name=".JarvisVoiceService"
             android:enabled="true"
@@ -103,7 +104,6 @@
             android:foregroundServiceType="microphone" />
 
         <!-- FLOATING EMOJI POPUP -->
-
         <service
             android:name=".JarvisFloatingService"
             android:enabled="true"
