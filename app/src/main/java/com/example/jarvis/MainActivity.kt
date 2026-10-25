@@ -1,3 +1,4 @@
+
 package com.example.jarvis
 
 import android.Manifest
@@ -34,6 +35,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val audioRequest = 101
     private val overlayRequest = 202
     private val contactRequest = 303
+    private val answerRequest = 304
 
     private val cyan = Color.rgb(44, 204, 255)
     private val blue = Color.rgb(15, 95, 180)
@@ -67,12 +69,17 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
 
         val scroll = ScrollView(this).apply {
-            fillViewport = true
+            isFillViewport = true
         }
 
         val page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(18), dp(16), dp(24))
+            setPadding(
+                dp(16),
+                dp(18),
+                dp(16),
+                dp(24)
+            )
         }
 
         scroll.addView(page)
@@ -90,7 +97,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), dp(12), dp(12), dp(12))
+
+            setPadding(
+                dp(12),
+                dp(12),
+                dp(12),
+                dp(12)
+            )
+
             background = panelBackground()
         }
 
@@ -404,7 +418,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             "📲 ANSWER INCOMING CALL"
         ) {
             if (checkAnswerCallPermission()) {
-                say(JarvisIncomingCall.answer(this))
+                answerIncomingCall()
             }
         }
 
@@ -672,10 +686,19 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             arrayOf(
                 Manifest.permission.ANSWER_PHONE_CALLS
             ),
-            contactRequest
+            answerRequest
         )
 
         return false
+    }
+
+    private fun answerIncomingCall() {
+        try {
+            val result = JarvisIncomingCall.answer(this)
+            say(result)
+        } catch (_: Exception) {
+            say("कॉल उठाने की सुविधा उपलब्ध नहीं हुई")
+        }
     }
 
     private fun checkAudioPermission(): Boolean {
@@ -746,6 +769,19 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                             "Incoming Call की अनुमति दें"
                     }
                 )
+            }
+
+            answerRequest -> {
+                val allowed =
+                    grantResults.isNotEmpty() &&
+                    grantResults[0] ==
+                    PackageManager.PERMISSION_GRANTED
+
+                if (allowed) {
+                    say("Incoming Call की अनुमति मिल गई")
+                } else {
+                    say("Incoming Call की अनुमति नहीं मिली")
+                }
             }
 
             audioRequest -> {
