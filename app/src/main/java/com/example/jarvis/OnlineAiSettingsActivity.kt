@@ -30,7 +30,7 @@ class OnlineAiSettingsActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         val root = ScrollView(this).apply {
-            setBackgroundColor(background)
+            setBackgroundColor(this@OnlineAiSettingsActivity.background)
         }
 
         val page = LinearLayout(this).apply {
