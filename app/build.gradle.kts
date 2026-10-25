@@ -23,4 +23,13 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    androidResources {
+        noCompress += "tflite"
+    }
+}
+
+dependencies {
+    // Offline AI Model Runtime
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
 }
