@@ -41,8 +41,6 @@ jobs:
           echo "Voice model directory ready"
           ls -lah app/src/main/assets
 
-      - name: Check Speaker Model Download
-        run: |
           python3 - <<'PY'
           import urllib.request
 
