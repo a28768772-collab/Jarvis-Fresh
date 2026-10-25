@@ -23,12 +23,4 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-
-    androidResources {
-        noCompress += "tflite"
-    }
-}
-
-dependencies {
-    implementation("org.tensorflow:tensorflow-lite:2.16.1")
 }
