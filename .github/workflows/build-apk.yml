@@ -35,6 +35,13 @@ jobs:
           ls -la
           find app -type f
 
+      # NEW: Prepare Offline Voice Model Folder
+      - name: Prepare Offline Voice Model Directory
+        run: |
+          mkdir -p app/src/main/assets
+          echo "Voice model directory ready"
+          ls -lah app/src/main/assets
+
       - name: Install Android SDK
         run: |
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
