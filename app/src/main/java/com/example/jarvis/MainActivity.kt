@@ -2,7 +2,6 @@ package com.example.jarvis
 
 import android.Manifest
 import android.app.Activity
-import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -53,33 +52,41 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         window.statusBarColor = backgroundColor
         window.navigationBarColor = backgroundColor
 
+        buildDashboard()
+
         tts = TextToSpeech(this, this)
 
-        buildDashboard()
         checkAudioPermission()
     }
 
     private fun buildDashboard() {
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(backgroundColor)
         }
 
-        val scroll = ScrollView(this)
+        val scroll = ScrollView(this).apply {
+            fillViewport = true
+        }
+
         val page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(18), dp(16), dp(24))
         }
 
         scroll.addView(page)
+
         root.addView(
             scroll,
             LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
             )
         )
 
         // HEADER
+
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -94,32 +101,57 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
         }
 
-        header.addView(logo, LinearLayout.LayoutParams(dp(52), dp(52)))
+        header.addView(
+            logo,
+            LinearLayout.LayoutParams(dp(52), dp(52))
+        )
 
         val titleBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
-        titleBox.addView(label("J.A.R.V.I.S", 22f, cyan, true))
-        titleBox.addView(label("PERSONAL AI SYSTEM", 10f, muted, false))
+        titleBox.addView(
+            label("J.A.R.V.I.S", 22f, cyan, true)
+        )
 
-        header.addView(titleBox, LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(label("ONLINE • 3.6", 11f, cyan, true))
+        titleBox.addView(
+            label("PERSONAL AI SYSTEM", 10f, muted, false)
+        )
+
+        header.addView(
+            titleBox,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        header.addView(
+            label("AI • 3.7", 11f, cyan, true)
+        )
+
         page.addView(header)
-
         page.addView(space(16))
 
-        // CLOCK AND STATUS
+        // CLOCK AND SYSTEM STATUS
+
         val topCards = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
         }
 
         val clockCard = card()
+
         clock = label("--:--", 30f, cyan, true)
+
         clockCard.addView(clock)
-        clockCard.addView(label("LOCAL DEVICE TIME", 10f, muted, false))
+
+        clockCard.addView(
+            label("LOCAL DEVICE TIME", 10f, muted, false)
+        )
+
         clockCard.addView(space(8))
-        clockCard.addView(label("◉  JARVIS READY", 12f, white, true))
+
+        clockCard.addView(
+            label("◉ JARVIS READY", 12f, white, true)
+        )
+
         topCards.addView(
             clockCard,
             LinearLayout.LayoutParams(0, dp(130), 1f).apply {
@@ -127,25 +159,47 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             }
         )
 
-        val statusCard = card()
-        statusCard.addView(label("SYSTEM STATUS", 14f, cyan, true))
-        statusCard.addView(space(8))
-        statusCard.addView(label("VOICE  •  Hindi", 12f, white, false))
-        statusCard.addView(label("CONTROL  •  Android", 12f, white, false))
-        statusCard.addView(label("MODE  •  Assistant", 12f, white, false))
+        val systemStatusCard = card()
+
+        systemStatusCard.addView(
+            label("SYSTEM STATUS", 14f, cyan, true)
+        )
+
+        systemStatusCard.addView(space(8))
+
+        systemStatusCard.addView(
+            label("VOICE • Hindi", 12f, white, false)
+        )
+
+        systemStatusCard.addView(
+            label("CONTROL • Android", 12f, white, false)
+        )
+
+        systemStatusCard.addView(
+            label("MODE • Assistant", 12f, white, false)
+        )
+
         topCards.addView(
-            statusCard,
+            systemStatusCard,
             LinearLayout.LayoutParams(0, dp(130), 1f)
         )
 
         page.addView(topCards)
         page.addView(space(16))
 
-        // CENTRAL JARVIS CORE
+        // CENTRAL HOLOGRAM CORE
+
         val core = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(dp(12), dp(18), dp(12), dp(18))
+
+            setPadding(
+                dp(12),
+                dp(18),
+                dp(12),
+                dp(18)
+            )
+
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 intArrayOf(
@@ -159,15 +213,20 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
 
         val coreSymbol = TextView(this).apply {
-            text = "◉"
-            textSize = 76f
+            text = "◎"
+            textSize = 90f
             gravity = Gravity.CENTER
             setTextColor(cyan)
         }
 
         core.addView(coreSymbol)
-        core.addView(label("JARVIS CORE", 23f, white, true))
+
+        core.addView(
+            label("JARVIS CORE", 23f, white, true)
+        )
+
         core.addView(space(4))
+
         core.addView(
             label(
                 "YOUR PERSONAL VOICE ASSISTANT",
@@ -176,49 +235,63 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 false
             )
         )
+
         core.addView(space(14))
 
         micButton = Button(this).apply {
-            text = "🎙  START HEY JARVIS"
+            text = "🎙 START HEY JARVIS"
             isAllCaps = false
             setTextColor(Color.WHITE)
             background = buttonBackground()
-            setOnClickListener { startJarvisVoice() }
+
+            setOnClickListener {
+                startJarvisVoice()
+            }
         }
 
         core.addView(
             micButton,
             LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(52)
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(52)
             )
         )
 
         page.addView(core)
         page.addView(space(16))
 
-        // STATUS MESSAGE
-        val statusCard = card()
+        // MESSAGE PANEL
+
+        val messageCard = card()
+
         status = label(
             "JARVIS तैयार है। कमांड बोलें या नीचे लिखें।",
             14f,
             white,
             false
         )
-        statusCard.addView(status)
-        page.addView(statusCard)
+
+        messageCard.addView(status)
+        page.addView(messageCard)
 
         page.addView(space(16))
-        page.addView(label("QUICK APPS", 17f, cyan, true))
+
+        // QUICK APPS
+
+        page.addView(
+            label("QUICK APPS", 17f, cyan, true)
+        )
+
         page.addView(space(8))
 
         val apps = listOf(
-            "▶  YouTube" to "youtube",
-            "◎  Chrome" to "chrome",
-            "●  WhatsApp" to "whatsapp",
-            "◎  Instagram" to "instagram",
-            "⚙  Settings" to "settings",
-            "▣  Camera" to "camera",
-            "▧  Gallery" to "gallery"
+            "▶ YouTube" to "YouTube खोलो",
+            "◎ Chrome" to "Chrome खोलो",
+            "● WhatsApp" to "WhatsApp खोलो",
+            "◎ Instagram" to "Instagram खोलो",
+            "⚙ Settings" to "Settings खोलो",
+            "▣ Camera" to "Camera खोलो",
+            "▧ Gallery" to "Gallery खोलो"
         )
 
         val appGrid = GridLayout(this).apply {
@@ -226,166 +299,243 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
 
         apps.forEach { item ->
-            val b = Button(this).apply {
+
+            val appButton = Button(this).apply {
                 text = item.first
                 isAllCaps = false
                 textSize = 13f
                 setTextColor(white)
                 background = panelBackground()
+
                 setOnClickListener {
-                    runCommand(
-                        when (item.second) {
-                            "youtube" -> "YouTube खोलो"
-                            "chrome" -> "Chrome खोलो"
-                            "whatsapp" -> "WhatsApp खोलो"
-                            "instagram" -> "Instagram खोलो"
-                            "settings" -> "Settings खोलो"
-                            "camera" -> "Camera खोलो"
-                            else -> "Gallery खोलो"
-                        }
-                    )
+                    runCommand(item.second)
                 }
             }
 
-            appGrid.addView(
-                b,
-                GridLayout.LayoutParams().apply {
-                    width = 0
-                    height = dp(54)
-                    columnSpec = GridLayout.spec(
-                        GridLayout.UNDEFINED, 1f
-                    )
-                    setMargins(dp(3), dp(3), dp(3), dp(3))
-                }
-            )
+            val params = GridLayout.LayoutParams().apply {
+                width = 0
+                height = dp(54)
+
+                columnSpec = GridLayout.spec(
+                    GridLayout.UNDEFINED,
+                    1,
+                    1f
+                )
+
+                setMargins(
+                    dp(3),
+                    dp(3),
+                    dp(3),
+                    dp(3)
+                )
+            }
+
+            appGrid.addView(appButton, params)
         }
 
         page.addView(appGrid)
         page.addView(space(16))
 
-        // COMMAND INPUT
-        page.addView(label("VOICE COMMAND CONSOLE", 17f, cyan, true))
+        // COMMAND CONSOLE
+
+        page.addView(
+            label("VOICE COMMAND CONSOLE", 17f, cyan, true)
+        )
+
         page.addView(space(8))
 
         command = EditText(this).apply {
             hint = "उदाहरण: YouTube खोलो"
+
             setHintTextColor(muted)
             setTextColor(white)
+
             textSize = 15f
-            singleLine = true
-            setPadding(dp(12), dp(12), dp(12), dp(12))
+
+            setSingleLine(true)
+
+            setPadding(
+                dp(12),
+                dp(12),
+                dp(12),
+                dp(12)
+            )
+
             background = inputBackground()
         }
 
         page.addView(
             command,
             LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(54)
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(54)
             )
         )
 
         page.addView(space(8))
 
-        addActionButton(page, "▶  RUN COMMAND") {
+        addActionButton(page, "▶ RUN COMMAND") {
             runCommand(command.text.toString())
         }
 
-        addActionButton(page, "🎤  SPEAK A COMMAND") {
+        addActionButton(page, "🎤 SPEAK A COMMAND") {
             listen()
         }
 
         page.addView(space(12))
-        page.addView(label("DEVICE CONTROL", 17f, cyan, true))
+
+        // DEVICE CONTROL
+
+        page.addView(
+            label("DEVICE CONTROL", 17f, cyan, true)
+        )
+
         page.addView(space(8))
 
-        addActionButton(page, "📞 ENABLE CONTACT CALLING") {
+        addActionButton(
+            page,
+            "📞 ENABLE PHONE CONTROL"
+        ) {
             checkContactPermissions()
         }
 
-        addActionButton(page, "📲 ANSWER INCOMING CALL") {
-            val result = try {
-                JarvisIncomingCall.answer(this)
-            } catch (_: Exception) {
-                "कॉल उठाने की सुविधा उपलब्ध नहीं हुई। Android अनुमति और फोन की संगतता जाँचें।"
+        addActionButton(
+            page,
+            "📲 ANSWER INCOMING CALL"
+        ) {
+            if (checkAnswerCallPermission()) {
+                say(JarvisIncomingCall.answer(this))
             }
-            say(result)
         }
 
-        addActionButton(page, "🔓 ENABLE ACCESSIBILITY CONTROL") {
-            openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        addActionButton(
+            page,
+            "🔓 ENABLE ACCESSIBILITY CONTROL"
+        ) {
+            openSettings(
+                Settings.ACTION_ACCESSIBILITY_SETTINGS
+            )
         }
 
-        addActionButton(page, "😎 SHOW FLOATING JARVIS") {
+        addActionButton(
+            page,
+            "😎 SHOW FLOATING JARVIS"
+        ) {
             startFloatingJarvis()
         }
 
-        addActionButton(page, "🙈 HIDE FLOATING JARVIS") {
+        addActionButton(
+            page,
+            "🙈 HIDE FLOATING JARVIS"
+        ) {
             stopService(
-                Intent(this, JarvisFloatingService::class.java)
+                Intent(
+                    this,
+                    JarvisFloatingService::class.java
+                )
             )
+
             say("Floating Jarvis बंद कर दिया गया")
         }
 
-        addActionButton(page, "⏹ STOP LISTENING") {
+        addActionButton(
+            page,
+            "⏹ STOP LISTENING"
+        ) {
             try {
-                startService(
-                    Intent(this, JarvisVoiceService::class.java).apply {
-                        action = JarvisVoiceService.SLEEP
-                    }
-                )
+                val intent = Intent(
+                    this,
+                    JarvisVoiceService::class.java
+                ).apply {
+                    action = JarvisVoiceService.SLEEP
+                }
+
+                startService(intent)
+
                 say("Jarvis सुनना बंद कर रहा है")
+
             } catch (_: Exception) {
                 say("Voice Service बंद नहीं हो सकी")
             }
         }
 
-        page.addView(space(12f))
-        page.addView(
-            label(
-                "J.A.R.V.I.S  •  VOICE  •  APP CONTROL  •  AUTOMATION",
-                10f,
-                muted,
-                false
-            ).apply {
-                gravity = Gravity.CENTER
-            }
-        )
+        page.addView(space(12))
+
+        val footer = label(
+            "J.A.R.V.I.S • VOICE • APP CONTROL • AUTOMATION",
+            10f,
+            muted,
+            false
+        ).apply {
+            gravity = Gravity.CENTER
+        }
+
+        page.addView(footer)
 
         setContentView(root)
+
         updateClock()
     }
 
+    // CLOCK
+
     private fun updateClock() {
-        val format = SimpleDateFormat("HH:mm", Locale.getDefault())
+        if (!::clock.isInitialized) return
+
+        val format = SimpleDateFormat(
+            "HH:mm",
+            Locale.getDefault()
+        )
+
         clock.text = format.format(Date())
-        clock.postDelayed({ updateClock() }, 30_000)
     }
 
+    override fun onResume() {
+        super.onResume()
+        updateClock()
+    }
+
+    // UI HELPERS
+
     private fun label(
-        textValue: String,
+        value: String,
         size: Float,
         color: Int,
         bold: Boolean
     ): TextView {
+
         return TextView(this).apply {
-            text = textValue
+            text = value
             textSize = size
             setTextColor(color)
-            if (bold) setTypeface(null, Typeface.BOLD)
+
+            if (bold) {
+                setTypeface(null, Typeface.BOLD)
+            }
         }
     }
 
     private fun card(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(12), dp(12), dp(12))
+
+            setPadding(
+                dp(12),
+                dp(12),
+                dp(12),
+                dp(12)
+            )
+
             background = panelBackground()
         }
     }
 
     private fun space(value: Int): View {
         return View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(1, dp(value))
+            layoutParams = LinearLayout.LayoutParams(
+                1,
+                dp(value)
+            )
         }
     }
 
@@ -394,19 +544,24 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         title: String,
         action: () -> Unit
     ) {
+
         val button = Button(this).apply {
             text = title
             isAllCaps = false
             textSize = 14f
             setTextColor(white)
             background = buttonBackground()
-            setOnClickListener { action() }
+
+            setOnClickListener {
+                action()
+            }
         }
 
         parent.addView(
             button,
             LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(52)
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(52)
             ).apply {
                 bottomMargin = dp(7)
             }
@@ -442,45 +597,104 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
+    private fun dp(value: Int): Int {
+        return (
+            value * resources.displayMetrics.density
+        ).toInt()
+    }
 
-    // CONTACT PERMISSIONS
+    // PHONE PERMISSIONS
 
     private fun checkContactPermissions(): Boolean {
+
         val missing = mutableListOf<String>()
 
-        if (checkSelfPermission(Manifest.permission.READ_CONTACTS)
-            != PackageManager.PERMISSION_GRANTED) {
-            missing.add(Manifest.permission.READ_CONTACTS)
+        if (
+            checkSelfPermission(
+                Manifest.permission.READ_CONTACTS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            missing.add(
+                Manifest.permission.READ_CONTACTS
+            )
         }
 
-        if (checkSelfPermission(Manifest.permission.CALL_PHONE)
-            != PackageManager.PERMISSION_GRANTED) {
-            missing.add(Manifest.permission.CALL_PHONE)
+        if (
+            checkSelfPermission(
+                Manifest.permission.CALL_PHONE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            missing.add(
+                Manifest.permission.CALL_PHONE
+            )
+        }
+
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            checkSelfPermission(
+                Manifest.permission.ANSWER_PHONE_CALLS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            missing.add(
+                Manifest.permission.ANSWER_PHONE_CALLS
+            )
         }
 
         if (missing.isEmpty()) {
-            say("Contacts और Phone की अनुमति पहले से चालू है")
-            return true
-        }
-
-        requestPermissions(missing.toTypedArray(), contactRequest)
-        return false
-    }
-
-    // AUDIO PERMISSION
-
-    private fun checkAudioPermission(): Boolean {
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
-            == PackageManager.PERMISSION_GRANTED) {
+            say("Jarvis Phone Control की अनुमतियाँ चालू हैं")
             return true
         }
 
         requestPermissions(
-            arrayOf(Manifest.permission.RECORD_AUDIO),
+            missing.toTypedArray(),
+            contactRequest
+        )
+
+        return false
+    }
+
+    private fun checkAnswerCallPermission(): Boolean {
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            say("इस Android संस्करण पर यह सुविधा उपलब्ध नहीं है")
+            return false
+        }
+
+        if (
+            checkSelfPermission(
+                Manifest.permission.ANSWER_PHONE_CALLS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            return true
+        }
+
+        requestPermissions(
+            arrayOf(
+                Manifest.permission.ANSWER_PHONE_CALLS
+            ),
+            contactRequest
+        )
+
+        return false
+    }
+
+    private fun checkAudioPermission(): Boolean {
+
+        if (
+            checkSelfPermission(
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            return true
+        }
+
+        requestPermissions(
+            arrayOf(
+                Manifest.permission.RECORD_AUDIO
+            ),
             audioRequest
         )
+
         return false
     }
 
@@ -489,35 +703,57 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
+
         super.onRequestPermissionsResult(
-            requestCode, permissions, grantResults
+            requestCode,
+            permissions,
+            grantResults
         )
 
         when (requestCode) {
-            contactRequest -> {
-                val contacts = checkSelfPermission(
-                    Manifest.permission.READ_CONTACTS
-                ) == PackageManager.PERMISSION_GRANTED
 
-                val phone = checkSelfPermission(
-                    Manifest.permission.CALL_PHONE
-                ) == PackageManager.PERMISSION_GRANTED
+            contactRequest -> {
+                val contactsAllowed =
+                    checkSelfPermission(
+                        Manifest.permission.READ_CONTACTS
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                val phoneAllowed =
+                    checkSelfPermission(
+                        Manifest.permission.CALL_PHONE
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                val answerAllowed =
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+                    checkSelfPermission(
+                        Manifest.permission.ANSWER_PHONE_CALLS
+                    ) == PackageManager.PERMISSION_GRANTED
 
                 say(
                     when {
-                        contacts && phone ->
-                            "Jarvis Contact Calling तैयार है"
-                        contacts ->
-                            "Contacts अनुमति मिल गई। Phone अनुमति भी दें।"
+                        contactsAllowed &&
+                        phoneAllowed &&
+                        answerAllowed ->
+                            "Jarvis Phone Control तैयार है"
+
+                        !contactsAllowed ->
+                            "Contacts की अनुमति दें"
+
+                        !phoneAllowed ->
+                            "Phone की अनुमति दें"
+
                         else ->
-                            "Contact खोजने के लिए Contacts अनुमति जरूरी है"
+                            "Incoming Call की अनुमति दें"
                     }
                 )
             }
 
             audioRequest -> {
-                val allowed = grantResults.isNotEmpty() &&
-                    grantResults[0] == PackageManager.PERMISSION_GRANTED
+
+                val allowed =
+                    grantResults.isNotEmpty() &&
+                    grantResults[0] ==
+                    PackageManager.PERMISSION_GRANTED
 
                 status.text = if (allowed) {
                     "माइक्रोफोन की अनुमति मिल गई"
@@ -528,11 +764,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
     }
 
-    // FLOATING BUBBLE
+    // FLOATING JARVIS
 
     private fun startFloatingJarvis() {
+
         if (!Settings.canDrawOverlays(this)) {
-            status.text = "पहले Display over other apps अनुमति चालू करें"
+
+            status.text =
+                "पहले Display over other apps अनुमति चालू करें"
 
             try {
                 startActivityForResult(
@@ -545,14 +784,20 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             } catch (_: Exception) {
                 say("Floating Window की सेटिंग नहीं खुल सकी")
             }
+
             return
         }
 
         try {
             startService(
-                Intent(this, JarvisFloatingService::class.java)
+                Intent(
+                    this,
+                    JarvisFloatingService::class.java
+                )
             )
+
             say("Floating Jarvis शुरू हो गया")
+
         } catch (_: Exception) {
             say("Floating Jarvis शुरू नहीं हो सका")
         }
@@ -561,13 +806,17 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     // VOICE SERVICE
 
     private fun startJarvisVoice() {
+
         if (!checkAudioPermission()) {
             say("पहले माइक्रोफोन की अनुमति दें")
             return
         }
 
         try {
-            val intent = Intent(this, JarvisVoiceService::class.java)
+            val intent = Intent(
+                this,
+                JarvisVoiceService::class.java
+            )
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(intent)
@@ -575,7 +824,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 startService(intent)
             }
 
-            status.text = "Jarvis Voice Service शुरू हो रही है"
+            status.text =
+                "Jarvis Voice Service शुरू हो रही है"
+
         } catch (_: Exception) {
             say("Voice Service शुरू नहीं हो सकी")
         }
@@ -584,17 +835,27 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     // TEXT TO SPEECH
 
     override fun onInit(code: Int) {
+
         if (code == TextToSpeech.SUCCESS) {
-            val result = tts?.setLanguage(Locale("hi", "IN"))
-            if (result == TextToSpeech.LANG_MISSING_DATA ||
-                result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                status.text = "Hindi voice उपलब्ध नहीं है; TTS भाषा सेट करें"
+
+            val result = tts?.setLanguage(
+                Locale("hi", "IN")
+            )
+
+            if (
+                result == TextToSpeech.LANG_MISSING_DATA ||
+                result == TextToSpeech.LANG_NOT_SUPPORTED
+            ) {
+                status.text =
+                    "Hindi Voice उपलब्ध नहीं है"
             }
         }
     }
 
     private fun say(message: String) {
+
         status.text = message
+
         tts?.speak(
             message,
             TextToSpeech.QUEUE_FLUSH,
@@ -606,21 +867,36 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     // SPEECH RECOGNITION
 
     private fun listen() {
+
         if (!checkAudioPermission()) return
 
         try {
+
             val intent = Intent(
                 RecognizerIntent.ACTION_RECOGNIZE_SPEECH
             ).apply {
+
                 putExtra(
                     RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                     RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
                 )
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hi-IN")
+
+                putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE,
+                    "hi-IN"
+                )
+
+                putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
+                    "hi-IN"
+                )
             }
 
-            startActivityForResult(intent, speechRequest)
+            startActivityForResult(
+                intent,
+                speechRequest
+            )
+
         } catch (_: Exception) {
             say("Voice Recognition उपलब्ध नहीं है")
         }
@@ -632,23 +908,36 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         resultCode: Int,
         data: Intent?
     ) {
-        super.onActivityResult(requestCode, resultCode, data)
+
+        super.onActivityResult(
+            requestCode,
+            resultCode,
+            data
+        )
 
         if (requestCode == overlayRequest) {
+
             if (Settings.canDrawOverlays(this)) {
                 startFloatingJarvis()
             } else {
                 say("Floating Jarvis के लिए अनुमति जरूरी है")
             }
+
             return
         }
 
-        if (requestCode == speechRequest && resultCode == RESULT_OK) {
-            val spoken = data?.getStringArrayListExtra(
-                RecognizerIntent.EXTRA_RESULTS
-            )?.firstOrNull() ?: return
+        if (
+            requestCode == speechRequest &&
+            resultCode == RESULT_OK
+        ) {
+
+            val spoken =
+                data?.getStringArrayListExtra(
+                    RecognizerIntent.EXTRA_RESULTS
+                )?.firstOrNull() ?: return
 
             command.setText(spoken)
+
             runCommand(spoken)
         }
     }
@@ -656,19 +945,23 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     // COMMAND MANAGER
 
     private fun runCommand(raw: String) {
-        if (raw.isBlank()) {
+
+        val text = raw.trim()
+
+        if (text.isBlank()) {
             say("कृपया कमांड दें")
             return
         }
 
         try {
-            say(manager.execute(raw))
+            say(manager.execute(text))
         } catch (_: Exception) {
             say("कमांड चलाने में समस्या आई")
         }
     }
 
     private fun openSettings(action: String) {
+
         try {
             startActivity(Intent(action))
             say("सेटिंग खोल रहा हूँ")
@@ -678,8 +971,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
+
         tts?.stop()
         tts?.shutdown()
+
         super.onDestroy()
     }
 }
