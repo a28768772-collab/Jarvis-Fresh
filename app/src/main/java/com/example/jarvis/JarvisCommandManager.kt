@@ -14,6 +14,7 @@ class JarvisCommandManager(
 ) {
 
     private val offlineBrain = JarvisOfflineBrain()
+    private val onlineBrain = OnlineAiBrain(context)
 
     fun execute(raw: String): String {
 
@@ -30,7 +31,6 @@ class JarvisCommandManager(
 
         // =========================
         // INCOMING CALL CONTROL
-        // Must run BEFORE contact calling.
         // =========================
 
         val answerCommands = setOf(
@@ -226,7 +226,9 @@ class JarvisCommandManager(
 
         return when {
 
+            // =========================
             // UNLOCK ASSISTANCE
+            // =========================
 
             text.contains("फोन अनलॉक") ||
             text.contains("मोबाइल अनलॉक") ||
@@ -256,7 +258,9 @@ class JarvisCommandManager(
                 }
             }
 
+            // =========================
             // PHONE LOCK
+            // =========================
 
             text.contains("फोन लॉक") ||
             text.contains("मोबाइल लॉक") ||
@@ -277,7 +281,9 @@ class JarvisCommandManager(
                 }
             }
 
+            // =========================
             // SCROLL DOWN
+            // =========================
 
             text.contains("नीचे स्क्रॉल") ||
             text.contains("scroll down") -> {
@@ -295,7 +301,9 @@ class JarvisCommandManager(
                 }
             }
 
+            // =========================
             // SCROLL UP
+            // =========================
 
             text.contains("ऊपर स्क्रॉल") ||
             text.contains("scroll up") -> {
@@ -313,7 +321,9 @@ class JarvisCommandManager(
                 }
             }
 
+            // =========================
             // CLICK VISIBLE BUTTON
+            // =========================
 
             text.startsWith("क्लिक ") ||
             text.startsWith("टच ") ||
@@ -337,7 +347,9 @@ class JarvisCommandManager(
                 }
             }
 
+            // =========================
             // HOME
+            // =========================
 
             text.contains("होम") ||
             text.contains("home") ||
@@ -348,7 +360,9 @@ class JarvisCommandManager(
                     AccessibilityService.GLOBAL_ACTION_HOME
                 )
 
+            // =========================
             // BACK
+            // =========================
 
             text.contains("बैक") ||
             text.contains("पीछे") ||
@@ -358,7 +372,9 @@ class JarvisCommandManager(
                     AccessibilityService.GLOBAL_ACTION_BACK
                 )
 
+            // =========================
             // RECENT APPS
+            // =========================
 
             text.contains("रीसेंट") ||
             text.contains("recent") ->
@@ -367,7 +383,9 @@ class JarvisCommandManager(
                     AccessibilityService.GLOBAL_ACTION_RECENTS
                 )
 
+            // =========================
             // NOTIFICATIONS
+            // =========================
 
             text.contains("नोटिफिकेशन") ||
             text.contains("notification") ->
@@ -376,7 +394,9 @@ class JarvisCommandManager(
                     AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
                 )
 
+            // =========================
             // QUICK SETTINGS
+            // =========================
 
             text.contains("क्विक सेटिंग") ||
             text.contains("quick settings") ->
@@ -385,7 +405,9 @@ class JarvisCommandManager(
                     AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS
                 )
 
+            // =========================
             // YOUTUBE
+            // =========================
 
             text.contains("यूट्यूब") ||
             text.contains("youtube") ->
@@ -395,7 +417,9 @@ class JarvisCommandManager(
                     "https://youtube.com"
                 )
 
+            // =========================
             // WHATSAPP
+            // =========================
 
             text.contains("व्हाट्सएप") ||
             text.contains("व्हाट्सऐप") ||
@@ -406,7 +430,9 @@ class JarvisCommandManager(
                     "https://whatsapp.com"
                 )
 
+            // =========================
             // INSTAGRAM
+            // =========================
 
             text.contains("इंस्टाग्राम") ||
             text.contains("instagram") ->
@@ -416,7 +442,9 @@ class JarvisCommandManager(
                     "https://instagram.com"
                 )
 
+            // =========================
             // FACEBOOK
+            // =========================
 
             text.contains("फेसबुक") ||
             text.contains("facebook") ->
@@ -426,7 +454,9 @@ class JarvisCommandManager(
                     "https://facebook.com"
                 )
 
+            // =========================
             // CHROME
+            // =========================
 
             text.contains("क्रोम") ||
             text.contains("chrome") ->
@@ -436,7 +466,9 @@ class JarvisCommandManager(
                     "https://google.com"
                 )
 
+            // =========================
             // GOOGLE MAPS
+            // =========================
 
             text.contains("मैप") ||
             text.contains("maps") -> {
@@ -463,7 +495,9 @@ class JarvisCommandManager(
                 }
             }
 
+            // =========================
             // CAMERA
+            // =========================
 
             text.contains("कैमरा") ||
             text.contains("camera") ->
@@ -475,7 +509,9 @@ class JarvisCommandManager(
                     "कैमरा खोल रहा हूँ"
                 )
 
+            // =========================
             // GALLERY
+            // =========================
 
             text.contains("गैलरी") ||
             text.contains("gallery") ||
@@ -491,7 +527,9 @@ class JarvisCommandManager(
                     "गैलरी खोल रहा हूँ"
                 )
 
+            // =========================
             // MUSIC
+            // =========================
 
             text.contains("म्यूजिक") ||
             text.contains("music") ||
@@ -506,7 +544,9 @@ class JarvisCommandManager(
                     "म्यूजिक ऐप खोल रहा हूँ"
                 )
 
+            // =========================
             // CALCULATOR
+            // =========================
 
             text.contains("कैलकुलेटर") ||
             text.contains("calculator") -> {
@@ -525,7 +565,9 @@ class JarvisCommandManager(
                 )
             }
 
+            // =========================
             // PHONE DIALER
+            // =========================
 
             text.contains("डायलर") ||
             text.contains("dialer") ||
@@ -536,7 +578,9 @@ class JarvisCommandManager(
                     "फोन डायलर खोल रहा हूँ"
                 )
 
+            // =========================
             // WIFI SETTINGS
+            // =========================
 
             text.contains("वाईफाई") ||
             text.contains("वाई-फाई") ||
@@ -548,7 +592,9 @@ class JarvisCommandManager(
                     "वाई-फाई सेटिंग खोल रहा हूँ"
                 )
 
+            // =========================
             // BLUETOOTH SETTINGS
+            // =========================
 
             text.contains("ब्लूटूथ") ||
             text.contains("bluetooth") ->
@@ -558,10 +604,12 @@ class JarvisCommandManager(
                     "ब्लूटूथ सेटिंग खोल रहा हूँ"
                 )
 
+            // =========================
             // BATTERY SETTINGS
+            // =========================
 
             text.contains("बैटरी") ||
-            text.contains("battery") ->
+            text.contains("battery") -> {
 
                 launch(
                     Intent(
@@ -569,8 +617,11 @@ class JarvisCommandManager(
                     ),
                     "बैटरी सेटिंग खोल रहा हूँ"
                 )
+            }
 
+            // =========================
             // DISPLAY SETTINGS
+            // =========================
 
             text.contains("डिस्प्ले") ||
             text.contains("display") ||
@@ -582,7 +633,9 @@ class JarvisCommandManager(
                     "डिस्प्ले सेटिंग खोल रहा हूँ"
                 )
 
+            // =========================
             // SOUND SETTINGS
+            // =========================
 
             text.contains("साउंड सेटिंग") ||
             text.contains("आवाज सेटिंग") ||
@@ -593,7 +646,9 @@ class JarvisCommandManager(
                     "साउंड सेटिंग खोल रहा हूँ"
                 )
 
+            // =========================
             // PHONE SETTINGS
+            // =========================
 
             text.contains("सेटिंग") ||
             text.contains("settings") ->
@@ -603,7 +658,9 @@ class JarvisCommandManager(
                     "फोन सेटिंग खोल रहा हूँ"
                 )
 
+            // =========================
             // GOOGLE SEARCH
+            // =========================
 
             text.startsWith("सर्च ") ||
             text.startsWith("search ") ->
@@ -612,7 +669,9 @@ class JarvisCommandManager(
                     text.substringAfter(' ').trim()
                 )
 
+            // =========================
             // WEBSITE CONTROL
+            // =========================
 
             text.startsWith("वेबसाइट ") ||
             text.startsWith("website ") -> {
@@ -640,12 +699,29 @@ class JarvisCommandManager(
                 }
             }
 
-            // OFFLINE AI BRAIN
+            // =========================
+            // ONLINE AI → OFFLINE FALLBACK
+            // =========================
 
             else -> {
 
-                offlineBrain.answer(raw)
-                    ?: "यह सवाल मेरी ऑफलाइन जानकारी में अभी उपलब्ध नहीं है"
+                // पहले Online AI try करें।
+                // अगर Online AI enabled नहीं है या request fail होती है,
+                // तो Offline Brain इस्तेमाल होगा।
+
+                val onlineAnswer = try {
+                    onlineBrain.askBlocking(raw)
+                } catch (_: Exception) {
+                    null
+                }
+
+                onlineAnswer?.takeIf {
+                    it.isNotBlank()
+                } ?: run {
+
+                    offlineBrain.answer(raw)
+                        ?: "यह सवाल मेरी जानकारी में अभी उपलब्ध नहीं है"
+                }
             }
         }
     }
