@@ -23,7 +23,6 @@ class OnlineAiBrain(private val context: Context) {
     companion object {
         private const val PREFS = "jarvis_online_ai"
 
-        private const val KEY_ENDPOINT = "endpoint"
         private const val KEY_MODEL = "model"
         private const val KEY_ENABLED = "enabled"
         private const val KEY_API = "api_blob"
@@ -32,14 +31,11 @@ class OnlineAiBrain(private val context: Context) {
         private const val KEYSTORE = "AndroidKeyStore"
         private const val KEY_ALIAS = "jarvis_online_ai_key"
 
-        private const val GEMINI_ENDPOINT =
-            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        private const val GEMINI_BASE_URL =
+            "https://generativelanguage.googleapis.com/v1beta"
 
-        private const val GEMINI_MODEL =
+        private const val DEFAULT_MODEL =
             "gemini-3.8-flash"
-
-        private const val OLD_OPENAI_ENDPOINT =
-            "https://api.openai.com/v1/chat/completions"
 
         private const val OLD_OPENAI_MODEL =
             "gpt-4o-mini"
@@ -52,7 +48,7 @@ class OnlineAiBrain(private val context: Context) {
         )
 
     @Volatile
-    private var lastError: String = ""
+    private var lastError = ""
 
     fun isEnabled(): Boolean {
         return prefs.getBoolean(KEY_ENABLED, false) &&
@@ -60,20 +56,7 @@ class OnlineAiBrain(private val context: Context) {
     }
 
     fun getEndpoint(): String {
-        val saved =
-            prefs.getString(
-                KEY_ENDPOINT,
-                null
-            )?.trim().orEmpty()
-
-        return if (
-            saved.isBlank() ||
-            saved == OLD_OPENAI_ENDPOINT
-        ) {
-            GEMINI_ENDPOINT
-        } else {
-            saved
-        }
+        return GEMINI_BASE_URL
     }
 
     fun getModel(): String {
@@ -87,7 +70,7 @@ class OnlineAiBrain(private val context: Context) {
             saved.isBlank() ||
             saved == OLD_OPENAI_MODEL
         ) {
-            GEMINI_MODEL
+            DEFAULT_MODEL
         } else {
             saved
         }
@@ -99,31 +82,18 @@ class OnlineAiBrain(private val context: Context) {
         apiKey: String,
         enabled: Boolean
     ) {
-        val finalEndpoint =
-            if (
-                endpoint.trim().isBlank() ||
-                endpoint.trim() == OLD_OPENAI_ENDPOINT
-            ) {
-                GEMINI_ENDPOINT
-            } else {
-                endpoint.trim()
-            }
 
         val finalModel =
             if (
                 model.trim().isBlank() ||
                 model.trim() == OLD_OPENAI_MODEL
             ) {
-                GEMINI_MODEL
+                DEFAULT_MODEL
             } else {
                 model.trim()
             }
 
         prefs.edit()
-            .putString(
-                KEY_ENDPOINT,
-                finalEndpoint
-            )
             .putString(
                 KEY_MODEL,
                 finalModel
@@ -135,7 +105,9 @@ class OnlineAiBrain(private val context: Context) {
             .apply()
 
         if (apiKey.isNotBlank()) {
-            encryptAndStore(apiKey.trim())
+            encryptAndStore(
+                apiKey.trim()
+            )
         }
     }
 
@@ -145,6 +117,7 @@ class OnlineAiBrain(private val context: Context) {
     }
 
     fun getApiKey(): String? {
+
         val blob =
             prefs.getString(
                 KEY_API,
@@ -158,6 +131,7 @@ class OnlineAiBrain(private val context: Context) {
             ) ?: return null
 
         return try {
+
             val iv =
                 Base64.decode(
                     ivText,
@@ -190,6 +164,7 @@ class OnlineAiBrain(private val context: Context) {
             )
 
         } catch (_: Exception) {
+
             null
         }
     }
@@ -204,6 +179,7 @@ class OnlineAiBrain(private val context: Context) {
         ) {
             lastError =
                 "API key missing या Online AI disabled"
+
             return null
         }
 
@@ -211,7 +187,9 @@ class OnlineAiBrain(private val context: Context) {
 
         val task =
             Callable {
-                request(userText)
+                request(
+                    userText
+                )
             }
 
         val executor =
@@ -222,7 +200,7 @@ class OnlineAiBrain(private val context: Context) {
             executor
                 .submit(task)
                 .get(
-                    25,
+                    35,
                     TimeUnit.SECONDS
                 )
 
@@ -230,7 +208,7 @@ class OnlineAiBrain(private val context: Context) {
 
             lastError =
                 "Connection error: ${
-                    e.message ?: "unknown error"
+                    e.message ?: "timeout"
                 }"
 
             null
@@ -261,7 +239,7 @@ class OnlineAiBrain(private val context: Context) {
         } else {
 
             if (lastError.isBlank()) {
-                "Gemini Online AI test failed. Unknown error."
+                "Gemini test failed. Unknown error."
             } else {
                 "Gemini ERROR:\n$lastError"
             }
@@ -276,46 +254,50 @@ class OnlineAiBrain(private val context: Context) {
             getApiKey()
 
         if (apiKey.isNullOrBlank()) {
+
             lastError =
                 "API key खाली है"
+
             return null
         }
 
-        val endpoint =
-            getEndpoint()
-
         val model =
             getModel()
+
+        val endpoint =
+            "$GEMINI_BASE_URL/models/$model:generateContent"
 
         val body =
             JSONObject().apply {
 
                 put(
-                    "model",
-                    model
-                )
-
-                put(
-                    "messages",
-                    JSONArray().apply {
+                    "systemInstruction",
+                    JSONObject().apply {
 
                         put(
-                            JSONObject().apply {
+                            "parts",
+                            JSONArray().apply {
 
                                 put(
-                                    "role",
-                                    "system"
-                                )
+                                    JSONObject().apply {
 
-                                put(
-                                    "content",
-                                    "You are JARVIS, a concise Hindi-speaking phone assistant. " +
-                                        "Answer naturally in Hindi unless the user asks for another language. " +
-                                        "Be helpful, direct and polite. " +
-                                        "Do not claim that you performed a phone action unless the Android app actually performed it."
+                                        put(
+                                            "text",
+                                            "You are JARVIS, a concise Hindi-speaking phone assistant. " +
+                                                "Answer naturally in Hindi unless the user asks for another language. " +
+                                                "Be helpful, direct and polite. " +
+                                                "Do not claim that you performed a phone action unless the Android app actually performed it."
+                                        )
+                                    }
                                 )
                             }
                         )
+                    }
+                )
+
+                put(
+                    "contents",
+                    JSONArray().apply {
 
                         put(
                             JSONObject().apply {
@@ -326,8 +308,19 @@ class OnlineAiBrain(private val context: Context) {
                                 )
 
                                 put(
-                                    "content",
-                                    userText
+                                    "parts",
+                                    JSONArray().apply {
+
+                                        put(
+                                            JSONObject().apply {
+
+                                                put(
+                                                    "text",
+                                                    userText
+                                                )
+                                            }
+                                        )
+                                    }
                                 )
                             }
                         )
@@ -335,8 +328,19 @@ class OnlineAiBrain(private val context: Context) {
                 )
 
                 put(
-                    "temperature",
-                    0.5
+                    "generationConfig",
+                    JSONObject().apply {
+
+                        put(
+                            "temperature",
+                            0.5
+                        )
+
+                        put(
+                            "maxOutputTokens",
+                            1024
+                        )
+                    }
                 )
             }.toString()
 
@@ -352,13 +356,17 @@ class OnlineAiBrain(private val context: Context) {
                         as HttpURLConnection
                     ).apply {
 
-                    requestMethod = "POST"
+                    requestMethod =
+                        "POST"
 
-                    connectTimeout = 10000
+                    connectTimeout =
+                        15000
 
-                    readTimeout = 20000
+                    readTimeout =
+                        30000
 
-                    doOutput = true
+                    doOutput =
+                        true
 
                     setRequestProperty(
                         "Content-Type",
@@ -371,8 +379,8 @@ class OnlineAiBrain(private val context: Context) {
                     )
 
                     setRequestProperty(
-                        "Authorization",
-                        "Bearer $apiKey"
+                        "x-goog-api-key",
+                        apiKey
                     )
                 }
 
@@ -423,13 +431,19 @@ class OnlineAiBrain(private val context: Context) {
             }
 
             val answer =
-                parseAnswer(responseText)
+                parseAnswer(
+                    responseText
+                )
 
             if (answer.isNullOrBlank()) {
+
                 lastError =
-                    "HTTP $code: Response मिला लेकिन AI answer नहीं मिला."
+                    "HTTP $code: Gemini response आया लेकिन text answer नहीं मिला."
+
                 null
+
             } else {
+
                 answer
             }
 
@@ -448,69 +462,6 @@ class OnlineAiBrain(private val context: Context) {
         }
     }
 
-    private fun formatApiError(
-        code: Int,
-        responseText: String
-    ): String {
-
-        val clean =
-            try {
-
-                val root =
-                    JSONObject(responseText)
-
-                val error =
-                    root.optJSONObject("error")
-
-                if (error != null) {
-
-                    val message =
-                        error.optString(
-                            "message"
-                        ).trim()
-
-                    val type =
-                        error.optString(
-                            "type"
-                        ).trim()
-
-                    if (
-                        message.isNotBlank()
-                    ) {
-
-                        if (
-                            type.isNotBlank()
-                        ) {
-                            "$message\nType: $type"
-                        } else {
-                            message
-                        }
-
-                    } else {
-                        responseText
-                    }
-
-                } else {
-                    responseText
-                }
-
-            } catch (_: Exception) {
-
-                responseText
-            }
-
-        val shortText =
-            clean
-                .replace(
-                    Regex("\\s+"),
-                    " "
-                )
-                .trim()
-                .take(500)
-
-        return "HTTP $code: $shortText"
-    }
-
     private fun parseAnswer(
         jsonText: String
     ): String? {
@@ -518,22 +469,117 @@ class OnlineAiBrain(private val context: Context) {
         return try {
 
             val root =
-                JSONObject(jsonText)
+                JSONObject(
+                    jsonText
+                )
 
-            root
-                .optJSONArray("choices")
-                ?.optJSONObject(0)
-                ?.optJSONObject("message")
-                ?.optString("content")
-                ?.trim()
-                ?.takeIf {
+            val candidates =
+                root.optJSONArray(
+                    "candidates"
+                )
+
+            val firstCandidate =
+                candidates?.optJSONObject(
+                    0
+                )
+
+            val content =
+                firstCandidate?.optJSONObject(
+                    "content"
+                )
+
+            val parts =
+                content?.optJSONArray(
+                    "parts"
+                )
+
+            val result =
+                StringBuilder()
+
+            if (parts != null) {
+
+                for (i in 0 until parts.length()) {
+
+                    val part =
+                        parts.optJSONObject(i)
+
+                    val text =
+                        part?.optString(
+                            "text"
+                        ).orEmpty()
+
+                    if (text.isNotBlank()) {
+
+                        if (result.isNotEmpty()) {
+                            result.append("\n")
+                        }
+
+                        result.append(
+                            text.trim()
+                        )
+                    }
+                }
+            }
+
+            result
+                .toString()
+                .trim()
+                .takeIf {
                     it.isNotBlank()
                 }
 
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+
+            lastError =
+                "Response parse error: ${
+                    e.message ?: "invalid response"
+                }"
 
             null
         }
+    }
+
+    private fun formatApiError(
+        code: Int,
+        responseText: String
+    ): String {
+
+        val message =
+            try {
+
+                val root =
+                    JSONObject(
+                        responseText
+                    )
+
+                val error =
+                    root.optJSONObject(
+                        "error"
+                    )
+
+                error?.optString(
+                    "message"
+                )?.trim()
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+                    ?: responseText
+
+            } catch (_: Exception) {
+
+                responseText
+            }
+
+        val clean =
+            message
+                .replace(
+                    Regex("\\s+"),
+                    " "
+                )
+                .trim()
+                .take(700)
+
+        return "HTTP $code: $clean"
     }
 
     private fun encryptAndStore(
@@ -590,7 +636,9 @@ class OnlineAiBrain(private val context: Context) {
 
         val keyStore =
             KeyStore
-                .getInstance(KEYSTORE)
+                .getInstance(
+                    KEYSTORE
+                )
                 .apply {
                     load(null)
                 }
