@@ -1,36 +1,24 @@
-
 <?xml version="1.0" encoding="utf-8"?>
-
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- INTERNET / ONLINE AI -->
     <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- VOICE PERMISSIONS -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!-- CONTACTS AND CALLS -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
-
-    <!-- FLOATING WINDOW -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- APP AND VOICE SERVICE VISIBILITY -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
-
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
-
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
@@ -42,58 +30,45 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
-        <!-- MAIN ACTIVITY + ASSISTANT ENTRY -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
-
-            <!-- Normal app icon -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
-            <!-- Android Digital Assistant -->
             <intent-filter>
                 <action android:name="android.intent.action.ASSIST" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-
         </activity>
 
-        <!-- ONLINE AI SETTINGS -->
         <activity
             android:name=".OnlineAiSettingsActivity"
             android:exported="false" />
 
-        <!-- ACCESSIBILITY CONTROL -->
         <service
             android:name=".JarvisAccessibility"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true">
-
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
-
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_config" />
         </service>
 
-        <!-- BACKGROUND VOICE SERVICE -->
         <service
             android:name=".JarvisVoiceService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
-        <!-- FLOATING POPUP -->
         <service
             android:name=".JarvisFloatingService"
             android:enabled="true"
             android:exported="false" />
 
     </application>
-
 </manifest>
