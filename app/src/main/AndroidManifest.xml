@@ -33,10 +33,12 @@
         <activity
             android:name=".MainActivity"
             android:exported="true">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
             <intent-filter>
                 <action android:name="android.intent.action.ASSIST" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -69,6 +71,34 @@
             android:name=".JarvisFloatingService"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- JARVIS Digital Assistant -->
+        <service
+            android:name=".JarvisVoiceInteractionService"
+            android:label="JARVIS"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:exported="true"
+            android:directBootAware="true">
+
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.service.voice"
+                android:resource="@xml/jarvis_voice_interaction_service" />
+        </service>
+
+        <service
+            android:name=".JarvisVoiceInteractionSessionService"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:exported="true"
+            android:directBootAware="true">
+
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionSessionService" />
+            </intent-filter>
+        </service>
 
     </application>
 </manifest>
