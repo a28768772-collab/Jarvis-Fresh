@@ -40,10 +40,19 @@ class OnlineAiBrain(private val context: Context) {
 
         private const val OLD_OPENAI_ENDPOINT =
             "https://api.openai.com/v1/chat/completions"
+
+        private const val OLD_OPENAI_MODEL =
+            "gpt-4o-mini"
     }
 
     private val prefs =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        context.getSharedPreferences(
+            PREFS,
+            Context.MODE_PRIVATE
+        )
+
+    @Volatile
+    private var lastError: String = ""
 
     fun isEnabled(): Boolean {
         return prefs.getBoolean(KEY_ENABLED, false) &&
@@ -51,40 +60,37 @@ class OnlineAiBrain(private val context: Context) {
     }
 
     fun getEndpoint(): String {
-        val saved = prefs.getString(KEY_ENDPOINT, null)
-            ?.trim()
-            .orEmpty()
+        val saved =
+            prefs.getString(
+                KEY_ENDPOINT,
+                null
+            )?.trim().orEmpty()
 
-        /*
-         * पुराने OpenAI settings को automatically Gemini पर बदलें।
-         */
-        if (
+        return if (
             saved.isBlank() ||
-            saved == OLD_OPENAI_ENDPOINT ||
-            saved == "https://api.openai.com/v1/chat/completions"
+            saved == OLD_OPENAI_ENDPOINT
         ) {
-            return GEMINI_ENDPOINT
+            GEMINI_ENDPOINT
+        } else {
+            saved
         }
-
-        return saved
     }
 
     fun getModel(): String {
-        val saved = prefs.getString(KEY_MODEL, null)
-            ?.trim()
-            .orEmpty()
+        val saved =
+            prefs.getString(
+                KEY_MODEL,
+                null
+            )?.trim().orEmpty()
 
-        /*
-         * पुराने OpenAI model को Gemini model पर बदलें।
-         */
-        if (
+        return if (
             saved.isBlank() ||
-            saved == "gpt-4o-mini"
+            saved == OLD_OPENAI_MODEL
         ) {
-            return GEMINI_MODEL
+            GEMINI_MODEL
+        } else {
+            saved
         }
-
-        return saved
     }
 
     fun setConfig(
@@ -93,30 +99,39 @@ class OnlineAiBrain(private val context: Context) {
         apiKey: String,
         enabled: Boolean
     ) {
+        val finalEndpoint =
+            if (
+                endpoint.trim().isBlank() ||
+                endpoint.trim() == OLD_OPENAI_ENDPOINT
+            ) {
+                GEMINI_ENDPOINT
+            } else {
+                endpoint.trim()
+            }
+
+        val finalModel =
+            if (
+                model.trim().isBlank() ||
+                model.trim() == OLD_OPENAI_MODEL
+            ) {
+                GEMINI_MODEL
+            } else {
+                model.trim()
+            }
+
         prefs.edit()
             .putString(
                 KEY_ENDPOINT,
-                if (
-                    endpoint.trim().isBlank() ||
-                    endpoint.trim() == OLD_OPENAI_ENDPOINT
-                ) {
-                    GEMINI_ENDPOINT
-                } else {
-                    endpoint.trim()
-                }
+                finalEndpoint
             )
             .putString(
                 KEY_MODEL,
-                if (
-                    model.trim().isBlank() ||
-                    model.trim() == "gpt-4o-mini"
-                ) {
-                    GEMINI_MODEL
-                } else {
-                    model.trim()
-                }
+                finalModel
             )
-            .putBoolean(KEY_ENABLED, enabled)
+            .putBoolean(
+                KEY_ENABLED,
+                enabled
+            )
             .apply()
 
         if (apiKey.isNotBlank()) {
@@ -126,16 +141,21 @@ class OnlineAiBrain(private val context: Context) {
 
     fun clearConfig() {
         prefs.edit().clear().apply()
+        lastError = ""
     }
 
     fun getApiKey(): String? {
         val blob =
-            prefs.getString(KEY_API, null)
-                ?: return null
+            prefs.getString(
+                KEY_API,
+                null
+            ) ?: return null
 
         val ivText =
-            prefs.getString(KEY_IV, null)
-                ?: return null
+            prefs.getString(
+                KEY_IV,
+                null
+            ) ?: return null
 
         return try {
             val iv =
@@ -174,14 +194,20 @@ class OnlineAiBrain(private val context: Context) {
         }
     }
 
-    fun askBlocking(userText: String): String? {
+    fun askBlocking(
+        userText: String
+    ): String? {
 
         if (
             !isEnabled() ||
             userText.isBlank()
         ) {
+            lastError =
+                "API key missing या Online AI disabled"
             return null
         }
+
+        lastError = ""
 
         val task =
             Callable {
@@ -200,7 +226,12 @@ class OnlineAiBrain(private val context: Context) {
                     TimeUnit.SECONDS
                 )
 
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+
+            lastError =
+                "Connection error: ${
+                    e.message ?: "unknown error"
+                }"
 
             null
 
@@ -222,14 +253,18 @@ class OnlineAiBrain(private val context: Context) {
             )
 
         return if (
-            result.isNullOrBlank()
+            !result.isNullOrBlank()
         ) {
 
-            "Gemini Online AI test failed. API key, model और internet check करें."
+            "Gemini Online AI connected: $result"
 
         } else {
 
-            "Gemini Online AI connected: $result"
+            if (lastError.isBlank()) {
+                "Gemini Online AI test failed. Unknown error."
+            } else {
+                "Gemini ERROR:\n$lastError"
+            }
         }
     }
 
@@ -239,7 +274,12 @@ class OnlineAiBrain(private val context: Context) {
 
         val apiKey =
             getApiKey()
-                ?: return null
+
+        if (apiKey.isNullOrBlank()) {
+            lastError =
+                "API key खाली है"
+            return null
+        }
 
         val endpoint =
             getEndpoint()
@@ -298,8 +338,7 @@ class OnlineAiBrain(private val context: Context) {
                     "temperature",
                     0.5
                 )
-            }
-                .toString()
+            }.toString()
 
         var connection:
             HttpURLConnection? = null
@@ -367,21 +406,39 @@ class OnlineAiBrain(private val context: Context) {
                             StandardCharsets.UTF_8
                         )
                     ).use { reader ->
-
                         reader.readText()
                     }
 
                 }.orEmpty()
 
             if (code !in 200..299) {
+
+                lastError =
+                    formatApiError(
+                        code,
+                        responseText
+                    )
+
                 return null
             }
 
-            parseAnswer(
-                responseText
-            )
+            val answer =
+                parseAnswer(responseText)
 
-        } catch (_: Exception) {
+            if (answer.isNullOrBlank()) {
+                lastError =
+                    "HTTP $code: Response मिला लेकिन AI answer नहीं मिला."
+                null
+            } else {
+                answer
+            }
+
+        } catch (e: Exception) {
+
+            lastError =
+                "Network/connection error: ${
+                    e.message ?: "unknown error"
+                }"
 
             null
 
@@ -389,6 +446,69 @@ class OnlineAiBrain(private val context: Context) {
 
             connection?.disconnect()
         }
+    }
+
+    private fun formatApiError(
+        code: Int,
+        responseText: String
+    ): String {
+
+        val clean =
+            try {
+
+                val root =
+                    JSONObject(responseText)
+
+                val error =
+                    root.optJSONObject("error")
+
+                if (error != null) {
+
+                    val message =
+                        error.optString(
+                            "message"
+                        ).trim()
+
+                    val type =
+                        error.optString(
+                            "type"
+                        ).trim()
+
+                    if (
+                        message.isNotBlank()
+                    ) {
+
+                        if (
+                            type.isNotBlank()
+                        ) {
+                            "$message\nType: $type"
+                        } else {
+                            message
+                        }
+
+                    } else {
+                        responseText
+                    }
+
+                } else {
+                    responseText
+                }
+
+            } catch (_: Exception) {
+
+                responseText
+            }
+
+        val shortText =
+            clean
+                .replace(
+                    Regex("\\s+"),
+                    " "
+                )
+                .trim()
+                .take(500)
+
+        return "HTTP $code: $shortText"
     }
 
     private fun parseAnswer(
@@ -465,7 +585,8 @@ class OnlineAiBrain(private val context: Context) {
         }
     }
 
-    private fun getOrCreateSecretKey(): SecretKey {
+    private fun getOrCreateSecretKey():
+        SecretKey {
 
         val keyStore =
             KeyStore
