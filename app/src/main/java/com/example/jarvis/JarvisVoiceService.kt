@@ -25,6 +25,13 @@ class JarvisVoiceService : Service(),
 
         private const val CHANNEL = "jarvis_voice"
         private const val NOTIFICATION_ID = 101
+
+        // MainActivity में भी इन्हीं preference keys का उपयोग करेंगे।
+        private const val PREFS = "jarvis_voice_settings"
+        private const val KEY_STYLE = "voice_style"
+        private const val KEY_RATE = "speech_rate"
+        private const val KEY_PITCH = "speech_pitch"
+        private const val KEY_VOICE_NAME = "voice_name"
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -38,9 +45,10 @@ class JarvisVoiceService : Service(),
     private var speaking = false
     private var waitingForCommand = false
     private var stopping = false
+    private var restartScheduled = false
 
     private var nextListen: Runnable? = null
-    private var restartScheduled = false
+    private var pendingSpeech: String? = null
 
     private val manager by lazy {
         JarvisCommandManager(this)
@@ -51,14 +59,16 @@ class JarvisVoiceService : Service(),
 
         tts = TextToSpeech(this, this)
 
-        val channel = NotificationChannel(
-            CHANNEL,
-            "Jarvis Voice Control",
-            NotificationManager.IMPORTANCE_LOW
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL,
+                "Jarvis Voice Control",
+                NotificationManager.IMPORTANCE_LOW
+            )
 
-        getSystemService(NotificationManager::class.java)
-            .createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java)
+                .createNotificationChannel(channel)
+        }
     }
 
     override fun onStartCommand(
@@ -74,7 +84,7 @@ class JarvisVoiceService : Service(),
             }
 
             WAKE -> {
-                // WAKE को सामान्य start request की तरह आगे चलने दें।
+                // सामान्य voice start जारी रहेगा।
             }
         }
 
@@ -159,12 +169,12 @@ class JarvisVoiceService : Service(),
                     SpeechRecognizer.createSpeechRecognizer(this)
 
                 recognizer?.setRecognitionListener(this)
-                listenAgain(1000)
+                listenAgain(1000L)
             } catch (_: Exception) {
                 enterSleepMode()
             }
         } else {
-            enterSleepMode()
+            speak("इस फोन में वॉइस रिकग्निशन उपलब्ध नहीं है")
         }
 
         return START_NOT_STICKY
@@ -190,9 +200,7 @@ class JarvisVoiceService : Service(),
     }
 
     private fun isStopCommand(raw: String): Boolean {
-        val text = normalize(raw)
-
-        return text in listOf(
+        return normalize(raw) in listOf(
             "jarvis stop",
             "hey jarvis stop",
             "stop jarvis",
@@ -202,10 +210,8 @@ class JarvisVoiceService : Service(),
             "जारवेज स्टॉप",
             "हे जार्विस स्टॉप",
             "हे जारविस स्टॉप",
-            "हे जार्वेज स्टॉप",
             "जार्विस बंद हो जाओ",
             "जारविस बंद हो जाओ",
-            "जार्वेज बंद हो जाओ",
             "जार्विस सुनना बंद करो",
             "जारविस सुनना बंद करो",
             "stop listening",
@@ -214,7 +220,6 @@ class JarvisVoiceService : Service(),
         )
     }
 
-    // पूरी तरह सुनना बंद करें
     private fun enterSleepMode() {
         if (stopping) return
 
@@ -224,6 +229,7 @@ class JarvisVoiceService : Service(),
         listening = false
         speaking = false
         restartScheduled = false
+        pendingSpeech = null
 
         notifyBubble("sleep")
 
@@ -231,7 +237,6 @@ class JarvisVoiceService : Service(),
             handler.removeCallbacks(it)
         }
         nextListen = null
-
         handler.removeCallbacksAndMessages(null)
 
         try {
@@ -247,11 +252,16 @@ class JarvisVoiceService : Service(),
         } catch (_: Exception) {
         }
 
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
+
         stopSelf()
     }
 
-    // एक समय में केवल एक लिसनिंग रीस्टार्ट शेड्यूल करें
     private fun listenAgain(delay: Long = 1200L) {
         if (!running || stopping || speaking || listening) return
         if (restartScheduled) return
@@ -269,7 +279,6 @@ class JarvisVoiceService : Service(),
             val currentRecognizer = recognizer
 
             if (currentRecognizer == null) {
-                // Recognizer उपलब्ध नहीं है; थोड़ी देर बाद फिर कोशिश करें।
                 listenAgain(2500L)
                 return@Runnable
             }
@@ -353,7 +362,7 @@ class JarvisVoiceService : Service(),
 
                 if (remaining.isEmpty()) {
                     waitingForCommand = true
-                    speak("जी सर, बताइए")
+                    speak("जी, बताइए")
                 } else {
                     executeCommand(remaining)
                 }
@@ -371,7 +380,7 @@ class JarvisVoiceService : Service(),
                 executeCommand(remaining)
             } else {
                 waitingForCommand = true
-                speak("जी सर, बताइए")
+                speak("जी, बताइए")
             }
         } else {
             listenAgain(1000L)
@@ -410,7 +419,14 @@ class JarvisVoiceService : Service(),
     private fun speak(message: String) {
         if (!running || stopping) return
 
+        if (message.isBlank()) {
+            speaking = false
+            listenAgain(800L)
+            return
+        }
+
         speaking = true
+        pendingSpeech = message
 
         nextListen?.let {
             handler.removeCallbacks(it)
@@ -427,56 +443,151 @@ class JarvisVoiceService : Service(),
         }
 
         if (ready) {
-            val result = tts?.speak(
+            speakPendingMessage()
+        }
+    }
+
+    private fun speakPendingMessage() {
+        if (!running || stopping || !ready) return
+
+        val message = pendingSpeech ?: return
+        pendingSpeech = null
+
+        val result = try {
+            tts?.speak(
                 message,
                 TextToSpeech.QUEUE_FLUSH,
-                null,
+                Bundle(),
                 "jarvis_voice"
-            )
+            ) ?: TextToSpeech.ERROR
+        } catch (_: Exception) {
+            TextToSpeech.ERROR
+        }
 
-            if (result != TextToSpeech.SUCCESS) {
-                speaking = false
-                listenAgain(2000L)
-            }
-        } else {
-            // TTS तैयार नहीं है; थोड़ी देर बाद दोबारा प्रयास करें।
+        if (result != TextToSpeech.SUCCESS) {
             speaking = false
             listenAgain(2000L)
         }
     }
 
+    private fun applySavedVoiceSettings() {
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+
+        val style = prefs.getString(KEY_STYLE, "natural") ?: "natural"
+        val rate = prefs.getFloat(KEY_RATE, 1.0f).coerceIn(0.5f, 2.0f)
+        val savedPitch = prefs.getFloat(KEY_PITCH, 1.0f)
+            .coerceIn(0.5f, 2.0f)
+
+        // Robot style को pitch और speed से approximate किया जाता है।
+        val pitch = when (style) {
+            "robotic" -> (savedPitch * 0.8f).coerceIn(0.5f, 2.0f)
+            "female" -> savedPitch.coerceAtLeast(1.05f).coerceAtMost(2.0f)
+            "male" -> savedPitch.coerceAtMost(0.95f).coerceAtLeast(0.5f)
+            else -> savedPitch
+        }
+
+        try {
+            tts?.setSpeechRate(
+                if (style == "robotic") {
+                    (rate * 0.9f).coerceIn(0.5f, 2.0f)
+                } else {
+                    rate
+                }
+            )
+            tts?.setPitch(pitch)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                val voiceName = prefs.getString(KEY_VOICE_NAME, null)
+                val availableVoices = tts?.voices.orEmpty()
+
+                val selectedVoice = availableVoices.firstOrNull {
+                    it.name == voiceName
+                }
+
+                if (selectedVoice != null) {
+                    tts?.voice = selectedVoice
+                } else {
+                    // यदि saved voice उपलब्ध नहीं है, तो Hindi voice खोजें।
+                    val hindiVoice = availableVoices.firstOrNull {
+                        it.locale.language.equals("hi", ignoreCase = true)
+                    }
+
+                    if (hindiVoice != null) {
+                        tts?.voice = hindiVoice
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            val languageResult = tts?.setLanguage(Locale("hi", "IN"))
+        if (status != TextToSpeech.SUCCESS) {
+            ready = false
+            return
+        }
+
+        val languageResult = try {
+            tts?.setLanguage(Locale("hi", "IN"))
+                ?: TextToSpeech.ERROR
+        } catch (_: Exception) {
+            TextToSpeech.ERROR
+        }
+
+        ready =
+            languageResult != TextToSpeech.LANG_MISSING_DATA &&
+            languageResult != TextToSpeech.LANG_NOT_SUPPORTED &&
+            languageResult != TextToSpeech.ERROR
+
+        if (!ready) {
+            // Hindi voice unavailable हो तो device default language आजमाएँ।
+            val fallback = try {
+                tts?.setLanguage(Locale.getDefault())
+                    ?: TextToSpeech.ERROR
+            } catch (_: Exception) {
+                TextToSpeech.ERROR
+            }
 
             ready =
-                languageResult != TextToSpeech.LANG_MISSING_DATA &&
-                languageResult != TextToSpeech.LANG_NOT_SUPPORTED
+                fallback != TextToSpeech.LANG_MISSING_DATA &&
+                fallback != TextToSpeech.LANG_NOT_SUPPORTED &&
+                fallback != TextToSpeech.ERROR
+        }
 
-            tts?.setOnUtteranceProgressListener(
-                object : UtteranceProgressListener() {
-                    override fun onStart(id: String?) {
-                    }
+        if (!ready) return
 
-                    override fun onDone(id: String?) {
-                        handler.post {
-                            if (!stopping && running) {
-                                speaking = false
-                                listenAgain(1000L)
-                            }
-                        }
-                    }
+        applySavedVoiceSettings()
 
-                    override fun onError(id: String?) {
-                        handler.post {
-                            if (!stopping && running) {
-                                speaking = false
-                                listenAgain(2000L)
-                            }
+        tts?.setOnUtteranceProgressListener(
+            object : UtteranceProgressListener() {
+                override fun onStart(id: String?) {
+                }
+
+                override fun onDone(id: String?) {
+                    handler.post {
+                        if (!stopping && running) {
+                            speaking = false
+                            listenAgain(700L)
                         }
                     }
                 }
-            )
+
+                override fun onError(id: String?) {
+                    handler.post {
+                        if (!stopping && running) {
+                            speaking = false
+                            listenAgain(1500L)
+                        }
+                    }
+                }
+            }
+        )
+
+        if (running && pendingSpeech != null) {
+            speakPendingMessage()
+        } else if (running) {
+            speaking = false
+            listenAgain(800L)
         }
     }
 
@@ -532,6 +643,7 @@ class JarvisVoiceService : Service(),
         listening = false
         speaking = false
         restartScheduled = false
+        pendingSpeech = null
 
         handler.removeCallbacksAndMessages(null)
         nextListen = null
