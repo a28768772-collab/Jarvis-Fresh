@@ -34,34 +34,20 @@ class JarvisCommandManager(
         // =========================
 
         val answerCommands = setOf(
-            "कॉल उठाओ",
-            "कॉल उठा लो",
-            "कॉल उठा दो",
-            "फोन उठाओ",
-            "फोन उठा लो",
-            "फोन उठा दो",
-            "कॉल रिसीव करो",
-            "फोन रिसीव करो",
-            "इनकमिंग कॉल उठाओ",
-            "answer call",
-            "answer the call",
-            "pick up call",
-            "pick up the call",
-            "receive call"
+            "कॉल उठाओ", "कॉल उठा लो", "कॉल उठा दो",
+            "फोन उठाओ", "फोन उठा लो", "फोन उठा दो",
+            "कॉल रिसीव करो", "फोन रिसीव करो",
+            "इनकमिंग कॉल उठाओ", "answer call",
+            "answer the call", "pick up call",
+            "pick up the call", "receive call"
         )
 
         val rejectCommands = setOf(
-            "कॉल काट दो",
-            "कॉल काटो",
-            "फोन काट दो",
-            "फोन काटो",
-            "कॉल रिजेक्ट करो",
-            "कॉल मत उठाओ",
-            "कॉल मत उठाना",
-            "reject call",
-            "decline call",
-            "end call",
-            "hang up"
+            "कॉल काट दो", "कॉल काटो", "फोन काट दो",
+            "फोन काटो", "कॉल रिजेक्ट करो",
+            "कॉल मत उठाओ", "कॉल मत उठाना",
+            "reject call", "decline call",
+            "end call", "hang up"
         )
 
         if (text in answerCommands) {
@@ -100,29 +86,18 @@ class JarvisCommandManager(
         }
 
         if (matchedSuffix != null) {
-
             val name = text
                 .removeSuffix(matchedSuffix)
                 .removePrefix("कृपया ")
                 .removePrefix("please ")
                 .trim()
 
-            return JarvisContactCalling.findContact(
-                context,
-                name
-            )
+            return JarvisContactCalling.findContact(context, name)
         }
 
         if (text.startsWith("call ")) {
-
-            val name = text
-                .removePrefix("call ")
-                .trim()
-
-            return JarvisContactCalling.findContact(
-                context,
-                name
-            )
+            val name = text.removePrefix("call ").trim()
+            return JarvisContactCalling.findContact(context, name)
         }
 
         // =========================
@@ -130,7 +105,6 @@ class JarvisCommandManager(
         // =========================
 
         fun global(action: Int): String {
-
             if (service == null) {
                 return "पहले Jarvis Accessibility चालू करें"
             }
@@ -146,20 +120,12 @@ class JarvisCommandManager(
         // OPEN ANDROID INTENT
         // =========================
 
-        fun launch(
-            intent: Intent,
-            response: String
-        ): String {
-
+        fun launch(intent: Intent, response: String): String {
             return try {
-
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
-
                 response
-
             } catch (_: Exception) {
-
                 "यह काम अभी नहीं हो सका"
             }
         }
@@ -169,12 +135,8 @@ class JarvisCommandManager(
         // =========================
 
         fun openUrl(url: String): String {
-
             return launch(
-                Intent(
-                    Intent.ACTION_VIEW,
-                    Uri.parse(url)
-                ),
+                Intent(Intent.ACTION_VIEW, Uri.parse(url)),
                 "जी सर, खोल रहा हूँ"
             )
         }
@@ -187,19 +149,12 @@ class JarvisCommandManager(
             packageName: String,
             fallback: String
         ): String {
-
             val intent = context.packageManager
                 .getLaunchIntentForPackage(packageName)
 
             return if (intent != null) {
-
-                launch(
-                    intent,
-                    "जी सर, ऐप खोल रहा हूँ"
-                )
-
+                launch(intent, "जी सर, ऐप खोल रहा हूँ")
             } else {
-
                 openUrl(fallback)
             }
         }
@@ -209,14 +164,12 @@ class JarvisCommandManager(
         // =========================
 
         fun search(query: String): String {
-
             if (query.isBlank()) {
                 return "क्या सर्च करना है?"
             }
 
             return openUrl(
-                "https://www.google.com/search?q=" +
-                    Uri.encode(query)
+                "https://www.google.com/search?q=" + Uri.encode(query)
             )
         }
 
@@ -225,6 +178,103 @@ class JarvisCommandManager(
         // =========================
 
         return when {
+
+            // =========================
+            // DOWNLOAD / INSTALL APP
+            // MUST BE BEFORE APP-OPEN COMMANDS
+            // =========================
+
+            text.contains("डाउनलोड") ||
+            text.contains("download") ||
+            text.contains("इंस्टॉल") ||
+            text.contains("install") -> {
+
+                val appOptions = listOf(
+                    Triple("whatsapp", "com.whatsapp", "WhatsApp"),
+                    Triple("व्हाट्सएप", "com.whatsapp", "WhatsApp"),
+                    Triple("व्हाट्सऐप", "com.whatsapp", "WhatsApp"),
+                    Triple("youtube", "com.google.android.youtube", "YouTube"),
+                    Triple("यूट्यूब", "com.google.android.youtube", "YouTube"),
+                    Triple("chrome", "com.android.chrome", "Chrome"),
+                    Triple("क्रोम", "com.android.chrome", "Chrome"),
+                    Triple("instagram", "com.instagram.android", "Instagram"),
+                    Triple("इंस्टाग्राम", "com.instagram.android", "Instagram"),
+                    Triple("facebook", "com.facebook.katana", "Facebook"),
+                    Triple("फेसबुक", "com.facebook.katana", "Facebook"),
+                    Triple("telegram", "org.telegram.messenger", "Telegram"),
+                    Triple("टेलीग्राम", "org.telegram.messenger", "Telegram")
+                )
+
+                val app = appOptions.firstOrNull {
+                    text.contains(it.first)
+                }
+
+                val appName = app?.third ?: text
+                    .replace("जार्विस", "")
+                    .replace("jarvis", "")
+                    .replace("डाउनलोड", "")
+                    .replace("download", "")
+                    .replace("इंस्टॉल", "")
+                    .replace("install", "")
+                    .replace("ऐप", "")
+                    .replace("app", "")
+                    .replace("कर दो", "")
+                    .replace("करो", "")
+                    .replace("please", "")
+                    .replace("प्लीज", "")
+                    .trim()
+
+                if (appName.isBlank()) {
+                    "कौन सा ऐप डाउनलोड करना है?"
+                } else {
+                    try {
+                        val storeUri = if (app != null) {
+                            Uri.parse("market://details?id=${app.second}")
+                        } else {
+                            Uri.parse(
+                                "market://search?q=${Uri.encode(appName)}&c=apps"
+                            )
+                        }
+
+                        val storeIntent = Intent(
+                            Intent.ACTION_VIEW,
+                            storeUri
+                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                        try {
+                            context.startActivity(storeIntent)
+                        } catch (_: Exception) {
+                            val webIntent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse(
+                                    if (app != null) {
+                                        "https://play.google.com/store/apps/details?id=${app.second}"
+                                    } else {
+                                        "https://play.google.com/store/search?q=${Uri.encode(appName)}"
+                                    }
+                                )
+                            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                            context.startActivity(webIntent)
+                        }
+
+                        if (app != null) {
+                            context.getSharedPreferences(
+                                "jarvis_downloads",
+                                Context.MODE_PRIVATE
+                            ).edit()
+                                .putString("pending_package", app.second)
+                                .putString("pending_name", app.third)
+                                .apply()
+                        }
+
+                        "जी सर, $appName का Play Store पेज खोल दिया है। डाउनलोड शुरू करने के लिए Install दबाएँ।"
+
+                    } catch (_: Exception) {
+                        "Play Store नहीं खुल पाया। कृपया इंटरनेट और Play Store जाँचें।"
+                    }
+                }
+            }
 
             // =========================
             // UNLOCK ASSISTANCE
@@ -237,23 +287,16 @@ class JarvisCommandManager(
             text.contains("unlock screen") -> {
 
                 try {
-
-                    val keyguardManager =
-                        context.getSystemService(
-                            Context.KEYGUARD_SERVICE
-                        ) as KeyguardManager
+                    val keyguardManager = context.getSystemService(
+                        Context.KEYGUARD_SERVICE
+                    ) as KeyguardManager
 
                     if (keyguardManager.isDeviceLocked) {
-
                         "फोन अनलॉक करने के लिए फिंगरप्रिंट, फेस या पिन इस्तेमाल करें"
-
                     } else {
-
                         "सर, फोन पहले से अनलॉक है"
                     }
-
                 } catch (_: Exception) {
-
                     "फोन की लॉक स्थिति नहीं जाँची जा सकी"
                 }
             }
@@ -269,13 +312,10 @@ class JarvisCommandManager(
             text.contains("lock screen") -> {
 
                 when {
-
                     service == null ->
                         "पहले Jarvis Accessibility चालू करें"
-
                     service.lockPhone() ->
                         "जी सर, फोन लॉक कर रहा हूँ"
-
                     else ->
                         "फोन लॉक नहीं हो सका"
                 }
@@ -289,13 +329,10 @@ class JarvisCommandManager(
             text.contains("scroll down") -> {
 
                 when {
-
                     service == null ->
                         "पहले Jarvis Accessibility चालू करें"
-
                     service.scroll(false) ->
                         "नीचे स्क्रॉल किया"
-
                     else ->
                         "स्क्रॉल नहीं हो सका"
                 }
@@ -309,13 +346,10 @@ class JarvisCommandManager(
             text.contains("scroll up") -> {
 
                 when {
-
                     service == null ->
                         "पहले Jarvis Accessibility चालू करें"
-
                     service.scroll(true) ->
                         "ऊपर स्क्रॉल किया"
-
                     else ->
                         "स्क्रॉल नहीं हो सका"
                 }
@@ -332,16 +366,12 @@ class JarvisCommandManager(
                 val label = text.substringAfter(' ').trim()
 
                 when {
-
                     service == null ->
                         "पहले Jarvis Accessibility चालू करें"
-
                     label.isBlank() ->
                         "किस बटन पर क्लिक करना है?"
-
                     service.tapLabel(label) ->
                         "क्लिक किया"
-
                     else ->
                         "यह बटन नहीं मिला"
                 }
@@ -355,10 +385,7 @@ class JarvisCommandManager(
             text.contains("home") ||
             text.contains("मुख्य स्क्रीन") ||
             text.contains("घर जाओ") ->
-
-                global(
-                    AccessibilityService.GLOBAL_ACTION_HOME
-                )
+                global(AccessibilityService.GLOBAL_ACTION_HOME)
 
             // =========================
             // BACK
@@ -367,10 +394,7 @@ class JarvisCommandManager(
             text.contains("बैक") ||
             text.contains("पीछे") ||
             text == "back" ->
-
-                global(
-                    AccessibilityService.GLOBAL_ACTION_BACK
-                )
+                global(AccessibilityService.GLOBAL_ACTION_BACK)
 
             // =========================
             // RECENT APPS
@@ -378,10 +402,7 @@ class JarvisCommandManager(
 
             text.contains("रीसेंट") ||
             text.contains("recent") ->
-
-                global(
-                    AccessibilityService.GLOBAL_ACTION_RECENTS
-                )
+                global(AccessibilityService.GLOBAL_ACTION_RECENTS)
 
             // =========================
             // NOTIFICATIONS
@@ -389,10 +410,7 @@ class JarvisCommandManager(
 
             text.contains("नोटिफिकेशन") ||
             text.contains("notification") ->
-
-                global(
-                    AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
-                )
+                global(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
 
             // =========================
             // QUICK SETTINGS
@@ -400,10 +418,7 @@ class JarvisCommandManager(
 
             text.contains("क्विक सेटिंग") ||
             text.contains("quick settings") ->
-
-                global(
-                    AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS
-                )
+                global(AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS)
 
             // =========================
             // YOUTUBE
@@ -411,7 +426,6 @@ class JarvisCommandManager(
 
             text.contains("यूट्यूब") ||
             text.contains("youtube") ->
-
                 openApp(
                     "com.google.android.youtube",
                     "https://youtube.com"
@@ -424,7 +438,6 @@ class JarvisCommandManager(
             text.contains("व्हाट्सएप") ||
             text.contains("व्हाट्सऐप") ||
             text.contains("whatsapp") ->
-
                 openApp(
                     "com.whatsapp",
                     "https://whatsapp.com"
@@ -436,7 +449,6 @@ class JarvisCommandManager(
 
             text.contains("इंस्टाग्राम") ||
             text.contains("instagram") ->
-
                 openApp(
                     "com.instagram.android",
                     "https://instagram.com"
@@ -448,7 +460,6 @@ class JarvisCommandManager(
 
             text.contains("फेसबुक") ||
             text.contains("facebook") ->
-
                 openApp(
                     "com.facebook.katana",
                     "https://facebook.com"
@@ -460,7 +471,6 @@ class JarvisCommandManager(
 
             text.contains("क्रोम") ||
             text.contains("chrome") ->
-
                 openApp(
                     "com.android.chrome",
                     "https://google.com"
@@ -483,11 +493,8 @@ class JarvisCommandManager(
                     .trim()
 
                 if (place.isBlank()) {
-
                     openUrl("https://maps.google.com")
-
                 } else {
-
                     openUrl(
                         "https://www.google.com/maps/search/?api=1&query=" +
                             Uri.encode(place)
@@ -501,11 +508,8 @@ class JarvisCommandManager(
 
             text.contains("कैमरा") ||
             text.contains("camera") ->
-
                 launch(
-                    Intent(
-                        MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA
-                    ),
+                    Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA),
                     "कैमरा खोल रहा हूँ"
                 )
 
@@ -516,7 +520,6 @@ class JarvisCommandManager(
             text.contains("गैलरी") ||
             text.contains("gallery") ||
             text.contains("फोटो दिखाओ") ->
-
                 launch(
                     Intent(
                         Intent.ACTION_VIEW,
@@ -534,11 +537,8 @@ class JarvisCommandManager(
             text.contains("म्यूजिक") ||
             text.contains("music") ||
             text.contains("गाने खोलो") ->
-
                 launch(
-                    Intent(
-                        Intent.ACTION_VIEW
-                    ).apply {
+                    Intent(Intent.ACTION_VIEW).apply {
                         type = "audio/*"
                     },
                     "म्यूजिक ऐप खोल रहा हूँ"
@@ -551,18 +551,11 @@ class JarvisCommandManager(
             text.contains("कैलकुलेटर") ||
             text.contains("calculator") -> {
 
-                val calculator = Intent(
-                    Intent.ACTION_MAIN
-                ).apply {
-                    addCategory(
-                        Intent.CATEGORY_APP_CALCULATOR
-                    )
+                val calculator = Intent(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_APP_CALCULATOR)
                 }
 
-                launch(
-                    calculator,
-                    "कैलकुलेटर खोल रहा हूँ"
-                )
+                launch(calculator, "कैलकुलेटर खोल रहा हूँ")
             }
 
             // =========================
@@ -572,7 +565,6 @@ class JarvisCommandManager(
             text.contains("डायलर") ||
             text.contains("dialer") ||
             text.contains("फोन खोलो") ->
-
                 launch(
                     Intent(Intent.ACTION_DIAL),
                     "फोन डायलर खोल रहा हूँ"
@@ -586,7 +578,6 @@ class JarvisCommandManager(
             text.contains("वाई-फाई") ||
             text.contains("wifi") ||
             text.contains("wi-fi") ->
-
                 launch(
                     Intent(Settings.ACTION_WIFI_SETTINGS),
                     "वाई-फाई सेटिंग खोल रहा हूँ"
@@ -598,7 +589,6 @@ class JarvisCommandManager(
 
             text.contains("ब्लूटूथ") ||
             text.contains("bluetooth") ->
-
                 launch(
                     Intent(Settings.ACTION_BLUETOOTH_SETTINGS),
                     "ब्लूटूथ सेटिंग खोल रहा हूँ"
@@ -609,15 +599,11 @@ class JarvisCommandManager(
             // =========================
 
             text.contains("बैटरी") ||
-            text.contains("battery") -> {
-
+            text.contains("battery") ->
                 launch(
-                    Intent(
-                        Settings.ACTION_BATTERY_SAVER_SETTINGS
-                    ),
+                    Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS),
                     "बैटरी सेटिंग खोल रहा हूँ"
                 )
-            }
 
             // =========================
             // DISPLAY SETTINGS
@@ -627,7 +613,6 @@ class JarvisCommandManager(
             text.contains("display") ||
             text.contains("ब्राइटनेस") ||
             text.contains("brightness") ->
-
                 launch(
                     Intent(Settings.ACTION_DISPLAY_SETTINGS),
                     "डिस्प्ले सेटिंग खोल रहा हूँ"
@@ -640,7 +625,6 @@ class JarvisCommandManager(
             text.contains("साउंड सेटिंग") ||
             text.contains("आवाज सेटिंग") ||
             text.contains("sound settings") ->
-
                 launch(
                     Intent(Settings.ACTION_SOUND_SETTINGS),
                     "साउंड सेटिंग खोल रहा हूँ"
@@ -652,7 +636,6 @@ class JarvisCommandManager(
 
             text.contains("सेटिंग") ||
             text.contains("settings") ->
-
                 launch(
                     Intent(Settings.ACTION_SETTINGS),
                     "फोन सेटिंग खोल रहा हूँ"
@@ -664,10 +647,7 @@ class JarvisCommandManager(
 
             text.startsWith("सर्च ") ||
             text.startsWith("search ") ->
-
-                search(
-                    text.substringAfter(' ').trim()
-                )
+                search(text.substringAfter(' ').trim())
 
             // =========================
             // WEBSITE CONTROL
@@ -683,18 +663,12 @@ class JarvisCommandManager(
                     .removeSuffix(" open")
                     .trim()
 
-                if (
-                    site.matches(
-                        Regex(
-                            "[a-z0-9.-]+\\.[a-z]{2,}(/[^ ]*)?"
-                        )
+                if (site.matches(
+                        Regex("[a-z0-9.-]+\\.[a-z]{2,}(/[^ ]*)?")
                     )
                 ) {
-
                     openUrl("https://$site")
-
                 } else {
-
                     "सही वेबसाइट का नाम बताइए"
                 }
             }
@@ -704,24 +678,17 @@ class JarvisCommandManager(
             // =========================
 
             else -> {
-
-                // पहले Online AI try करें।
-                // अगर Online AI enabled नहीं है या request fail होती है,
-                // तो Offline Brain इस्तेमाल होगा।
-
                 val onlineAnswer = try {
                     onlineBrain.askBlocking(raw)
                 } catch (_: Exception) {
                     null
                 }
 
-                onlineAnswer?.takeIf {
-                    it.isNotBlank()
-                } ?: run {
-
-                    offlineBrain.answer(raw)
-                        ?: "यह सवाल मेरी जानकारी में अभी उपलब्ध नहीं है"
-                }
+                onlineAnswer?.takeIf { it.isNotBlank() }
+                    ?: run {
+                        offlineBrain.answer(raw)
+                            ?: "यह सवाल मेरी जानकारी में अभी उपलब्ध नहीं है"
+                    }
             }
         }
     }
